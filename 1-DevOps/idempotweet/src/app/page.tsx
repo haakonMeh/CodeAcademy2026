@@ -1,5 +1,6 @@
 import { FeedContainer } from "./components/FeedContainer";
 
+// This is the main page of the application. It renders the header and the feed container.
 export default function Home() {
   return (
     <div className="min-h-screen">
