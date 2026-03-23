@@ -1,0 +1,26 @@
+name: haakonsWorkflow
+
+on:
+  pull_request:
+    paths:
+      - '1-DevOps/idempotweet/**'
+  workflow_call:
+
+
+jobs:
+  ci:
+    runs-on: ${{ vars.RUNNER || 'self-hosted' }}
+    defaults:
+      run:
+        working-directory: 1-DevOps/idempotweet
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+      - run: corepack enable
+        working-directory: ${{ github.workspace }}
+      - run: yarn install --immutable
+      - run: yarn test
+      - run: yarn test:coverage
