@@ -1,0 +1,24 @@
+# Dependencies (installed inside the container)
+node_modules
+.yarn/cache
+.yarn/unplugged
+
+# Build output (built inside the container)
+.next
+
+# Version control
+.git
+.gitignore
+
+# Environment files (secrets must not be baked into the image)
+.env
+.env.*
+!.env.example
+
+# Documentation and editor config (not needed in the image)
+README.md
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
