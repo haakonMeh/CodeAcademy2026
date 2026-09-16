@@ -1,0 +1,59 @@
+# Dockerfile — kaffebar-web (FASIT for ekstraoppgave 7)
+# Samme multi-stage-mønster som Dockerfilene i 3-APIs/kaffebar-*-solution.
+# Location: 4-Frontend/kaffebar-web/Dockerfile-solution
+# Build context: 4-Frontend/kaffebar-web
+#
+# Kopier innholdet til `Dockerfile` for å bruke den.
+
+# Stage 1: Install dependencies
+FROM node:24-alpine AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Enable corepack for Yarn v4
+RUN corepack enable
+
+# Copy package files
+COPY package.json yarn.lock .yarnrc.yml ./
+
+# Install dependencies
+RUN yarn install --immutable
+
+# Stage 2: Build the application
+FROM node:24-alpine AS builder
+WORKDIR /app
+
+RUN corepack enable
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# next.config.ts har output: "standalone" — bygget samler alt appen trenger
+# i .next/standalone, slik at runner-steget slipper node_modules.
+RUN yarn build
+
+# Stage 3: Production image
+FROM node:24-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Create non-root user for security
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+CMD ["node", "server.js"]

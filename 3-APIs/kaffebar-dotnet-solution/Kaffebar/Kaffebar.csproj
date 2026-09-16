@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Lagt inn av `dotnet user-jwts create` (oppgave 10). Bare en id, ingen
+         hemmelighet: selve nøklene ligger i ~/.microsoft/usersecrets, utenfor repoet. -->
+    <UserSecretsId>1e4bc8ac-35a4-46df-a961-6214f89acfb1</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Uendret fra starteren -->
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.4" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.14.14" />
+
+    <!-- Oppgave 10 (Entra ID). Autentisering er AV som standard — se FASIT.md. -->
+    <PackageReference Include="Microsoft.Identity.Web" Version="3.15.1" />
+
+    <!-- Valgfritt siste steg: hendelser til RabbitMQ. Også AV som standard. -->
+    <PackageReference Include="RabbitMQ.Client" Version="7.1.2" />
+  </ItemGroup>
+
+</Project>

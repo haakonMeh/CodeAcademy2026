@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Kaffebar.Tests/Kaffebar.Tests.csproj" />
+  <Project Path="Kaffebar/Kaffebar.csproj" />
+  <Project Path="Oppgave9/Oppgave9.csproj" />
+</Solution>

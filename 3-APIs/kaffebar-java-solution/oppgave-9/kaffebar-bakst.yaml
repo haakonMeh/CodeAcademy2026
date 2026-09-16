@@ -1,0 +1,140 @@
+# Oppgave 9 — polymorfisme. En egen, selvstendig kontrakt.
+#
+# HVORFOR EGEN FIL: legger du denne modelleringen inn i hovedkontrakten, brekker
+# wire-kompatibiliteten med 4-Frontend/kaffebar-api. `Order` får en helt ny form, og
+# den genererte TypeScript-klienten i samling 4 må skrives om. Referanse-
+# implementasjonen har utelatt oppgave 9 av nøyaktig samme grunn — se
+# 4-Frontend/kaffebar-api/README.md.
+#
+# Kjør den gjennom generatoren:
+#   mvn -f oppgave-9/pom.xml clean compile
+# og se på target/generated-sources/. NOTAT.md forteller hva som faktisk kom ut.
+
+openapi: 3.0.3
+
+info:
+  title: Kaffebar API — bakst (oppgave 9)
+  version: 1.0.0
+  description: |
+    Kaffebaren har begynt å selge bakst. En ordrelinje er nå *enten* en kaffedrikk
+    *eller* et bakverk, og de to har ulike attributter: kaffe har `milkType`, bakst
+    har `isVegan`.
+
+paths:
+  /orders-v2:
+    post:
+      summary: Opprett bestilling med blandede varelinjer
+      operationId: createMixedOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMixedOrderRequest'
+      responses:
+        '201':
+          description: Bestillingen ble opprettet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MixedOrder'
+
+components:
+  schemas:
+    CreateMixedOrderRequest:
+      type: object
+      required: [customerName, items]
+      properties:
+        customerName:
+          type: string
+          minLength: 2
+          maxLength: 50
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderItem'
+
+    MixedOrder:
+      type: object
+      required: [orderId, customerName, items, status, createdAt]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        customerName:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        status:
+          type: string
+          enum: [PENDING, BREWING, READY]
+        createdAt:
+          type: string
+          format: date-time
+
+    # Kjernen i oppgaven.
+    #
+    # `discriminator` er ikke pynt: uten den vet ikke generatoren — og ikke Jackson —
+    # hvilken av de to typene et innkommende JSON-objekt er. `propertyName` peker på et
+    # felt som må finnes i BEGGE undertypene, og `mapping` binder verdien i det feltet
+    # til et skjema.
+    OrderItem:
+      oneOf:
+        - $ref: '#/components/schemas/CoffeeItem'
+        - $ref: '#/components/schemas/PastryItem'
+      discriminator:
+        propertyName: type
+        mapping:
+          coffee: '#/components/schemas/CoffeeItem'
+          pastry: '#/components/schemas/PastryItem'
+
+    # MERK — dette er «fiklingen» oppgaveteksten advarer om:
+    #
+    # Skriver du `type: {type: string, enum: [coffee]}` her, lager generatoren en
+    # indre `TypeEnum` i CoffeeItem, mens interfacet `OrderItem` krever
+    # `String getType()`. Resultatet kompilerer ikke:
+    #
+    #   CoffeeItem is not abstract and does not override abstract method getType()
+    #   return type CoffeeItem.TypeEnum is not compatible with java.lang.String
+    #
+    # Diskriminator-feltet må derfor stå som en ren `string`. Verdiene ligger uansett
+    # i `discriminator.mapping` over, så kontrakten er like presis — den er bare
+    # presis ett sted i stedet for to.
+    CoffeeItem:
+      type: object
+      required: [type, coffeeId, size]
+      properties:
+        type:
+          type: string
+          description: Diskriminator. Alltid `coffee`.
+          example: coffee
+        coffeeId:
+          type: string
+          format: uuid
+        size:
+          type: string
+          enum: [SMALL, MEDIUM, LARGE]
+        milkType:
+          type: string
+          enum: [WHOLE, SKIMMED, OAT, SOY]
+        extraShot:
+          type: boolean
+
+    PastryItem:
+      type: object
+      required: [type, pastryId]
+      properties:
+        type:
+          type: string
+          description: Diskriminator. Alltid `pastry`.
+          example: pastry
+        pastryId:
+          type: string
+          format: uuid
+        isVegan:
+          type: boolean
+        warmed:
+          type: boolean

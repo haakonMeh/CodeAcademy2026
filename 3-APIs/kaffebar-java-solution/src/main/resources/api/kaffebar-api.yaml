@@ -1,0 +1,479 @@
+# Kaffebar API — den komplette kontrakten (fasit for oppgave 1 til 8).
+#
+# Dette er en utvidelse av startkontrakten i
+# 3-APIs/kaffebar-java/src/main/resources/api/kaffebar-api.yaml. `Coffee`-skjemaet og
+# `GET /menu` står igjen slik du skrev dem — resten er lagt til oppgave for oppgave.
+#
+# To ting er verdt å vite før du leser videre:
+#
+#  1. Filen er OpenAPI **3.0.3**, ikke 3.1. openapi-generator 7.4.0 har ujevn
+#     3.1-støtte. Referansekontrakten i 4-Frontend/kaffebar-api/openapi.yaml er 3.1;
+#     den er oversatt ned hit. I praksis betyr det `example:` i entall der 3.1 bruker
+#     `examples:`-array.
+#
+#  2. Kontrakten er *wire-kompatibel* med referansekontrakten: samme stier, samme
+#     feltnavn, samme enum-verdier, samme statuskoder og samme media types. En
+#     TypeScript-klient generert fra den ene skal kunne kalle den andre uten
+#     endringer. Det er det som gjør at frontenden i samling 4 kan peke hit.
+#
+# Oppgave 9 (polymorfisme) ligger bevisst IKKE her. Se oppgave-9/.
+
+openapi: 3.0.3
+
+info:
+  title: Kaffebar API
+  version: 1.0.0
+  description: |
+    Et contract-first API for å administrere bestillinger i en kaffebar.
+
+    Fasit for samling 3, Java-sporet. Lagrer alt i minne.
+  contact:
+    name: Sopra Steria Code Academy
+    url: https://github.com/Sopra-Steria-Code-Academy/CodeAcademy2026
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Lokal utvikling
+
+tags:
+  - name: menu
+    description: Kaffemenyen
+  - name: orders
+    description: Bestillinger
+  - name: system
+    description: Helsesjekk og drift
+
+paths:
+  # --- Utgangspunktet, uendret fra starteren ------------------------------
+  /menu:
+    get:
+      tags: [menu]
+      summary: Hent kaffemeny
+      description: Returnerer en liste over alle tilgjengelige kaffedrikker i kaffebaren.
+      operationId: getMenu
+      responses:
+        '200':
+          description: En liste med kaffedrikker ble vellykket hentet.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Coffee'
+
+  /orders:
+    # --- Oppgave 8: filtrering og paginering ------------------------------
+    get:
+      tags: [orders]
+      summary: Hent bestillinger
+      description: |
+        Returnerer bestillinger, nyeste først. Kan filtreres på status og pagineres
+        med `limit` og `offset`.
+      operationId: listOrders
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Returner kun bestillinger med denne statusen.
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - name: limit
+          in: query
+          required: false
+          description: Maks antall bestillinger i svaret.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          required: false
+          description: Hvor mange bestillinger som skal hoppes over.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: En liste med bestillinger.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    # --- Oppgave 1: den første bestillingen -------------------------------
+    post:
+      tags: [orders]
+      summary: Opprett bestilling
+      description: |
+        Oppretter en ny bestilling med status `PENDING`. Svarer `201` med en
+        `Location`-header som peker på den nye ressursen.
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Bestillingen ble opprettet.
+          headers:
+            Location:
+              description: URL-en til den opprettede bestillingen.
+              schema:
+                type: string
+                example: '/orders/7f3f1f6e-9a0a-4e0c-9f5f-2f0a5a1d8b21'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /orders/{orderId}:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+
+    # --- Oppgave 5 + 6: hent én bestilling, og 404 når den ikke finnes ----
+    get:
+      tags: [orders]
+      summary: Hent én bestilling
+      operationId: getOrder
+      responses:
+        '200':
+          description: Bestillingen ble funnet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    # --- Oppgave 7: baristaens oppdatering. Anbefalt variant. -------------
+    patch:
+      tags: [orders]
+      summary: Oppdater status på en bestilling
+      description: |
+        Den anbefalte måten å endre status på. `PATCH` fordi vi oppdaterer én
+        egenskap på ressursen, ikke erstatter hele den.
+      operationId: updateOrderStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrderStatusRequest'
+      responses:
+        '200':
+          description: Statusen ble oppdatert.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /orders/{orderId}/status:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+
+    # --- Oppgave 7, variant 2: action-endepunktet ------------------------
+    post:
+      tags: [orders]
+      summary: Oppdater status på en bestilling (action-variant)
+      description: |
+        Alias for `PATCH /orders/{orderId}`. Finnes fordi oppgave 7 lot det være opp
+        til hver deltaker om status skulle endres med `PUT`, `PATCH` eller et eget
+        action-endepunkt, og deltakerne valgte ulikt. Begge de to vanligste variantene
+        er støttet slik at en frontend kan peke på deltakerens eget API uten endringer.
+
+        `PATCH /orders/{orderId}` er anbefalingen.
+      operationId: setOrderStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrderStatusRequest'
+      responses:
+        '200':
+          description: Statusen ble oppdatert.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /health:
+    get:
+      tags: [system]
+      summary: Helsesjekk
+      description: |
+        Svarer alltid `200` så lenge HTTP-serveren lever. Status på
+        RabbitMQ-tilkoblingen rapporteres i `rabbitmq`-feltet, men gjør ikke
+        tjenesten usunn — API-et skal fungere selv om broker er nede.
+      operationId: getHealth
+      responses:
+        '200':
+          description: Tjenesten lever.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+
+components:
+  parameters:
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      description: Id-en til bestillingen.
+      schema:
+        type: string
+        format: uuid
+        example: '7f3f1f6e-9a0a-4e0c-9f5f-2f0a5a1d8b21'
+
+  # --- Oppgave 6: ett gjenbrukbart feilsvar, brukt av både 400 og 404 -----
+  responses:
+    BadRequest:
+      description: Requesten var ugyldig.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: Ressursen finnes ikke.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+  schemas:
+    # Uendret fra starteren, bortsett fra at `format: double` er tatt bort slik at
+    # prisen blir samme JSON-tall som i referansekontrakten (39, ikke 39.0).
+    Coffee:
+      type: object
+      title: Coffee
+      description: Representerer en kaffedrikk på menyen.
+      required: [id, name, price]
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 'c0ffee01-0000-4000-8000-000000000001'
+        name:
+          type: string
+          example: 'Kaffe Latte'
+        price:
+          type: number
+          description: Pris i norske kroner.
+          example: 52
+
+    # --- Oppgave 3: enums som egne, gjenbrukbare skjemaer ----------------
+    OrderStatus:
+      type: string
+      title: OrderStatus
+      description: |
+        Livssyklusen til en bestilling. `PENDING` → `BREWING` → `READY`.
+      enum: [PENDING, BREWING, READY]
+      example: 'PENDING'
+
+    CoffeeSize:
+      type: string
+      title: CoffeeSize
+      enum: [SMALL, MEDIUM, LARGE]
+      example: 'MEDIUM'
+
+    MilkType:
+      type: string
+      title: MilkType
+      enum: [WHOLE, SKIMMED, OAT, SOY]
+      example: 'OAT'
+
+    # --- Oppgave 1 + 3 + 4: request-objektet, med valideringen i kontrakten
+    CreateOrderRequest:
+      type: object
+      title: CreateOrderRequest
+      description: Det kunden sender inn for å bestille.
+      required: [coffeeId, customerName, size]
+      properties:
+        coffeeId:
+          type: string
+          format: uuid
+          description: Id-en til en kaffe fra `GET /menu`.
+          example: 'c0ffee01-0000-4000-8000-000000000001'
+        customerName:
+          type: string
+          description: |
+            Navnet bestillingen ropes opp på. Kan ikke være blankt.
+
+            Merk mønsteret: Jakarta Bean Validation sin `@Pattern` bruker
+            `matches()` — altså hele strengen — mens JSON Schema bruker delvis
+            treff. `\S` alene ville derfor bety «nøyaktig ett ikke-blankt tegn» i
+            Java. `^(?!\s*$).+$` betyr det samme i begge verdener: minst ett tegn
+            som ikke er blankt.
+          minLength: 2
+          maxLength: 50
+          pattern: '^(?!\s*$).+$'
+          example: 'Ada'
+        size:
+          $ref: '#/components/schemas/CoffeeSize'
+        milkType:
+          $ref: '#/components/schemas/MilkType'
+        extraShot:
+          type: boolean
+          description: Ekstra shot espresso.
+          example: false
+        quantity:
+          type: integer
+          description: Antall kopper i samme bestilling.
+          minimum: 1
+          maximum: 10
+          default: 1
+          example: 1
+
+    # --- Oppgave 7: et dedikert request-objekt med kun det som skal endres -
+    UpdateOrderStatusRequest:
+      type: object
+      title: UpdateOrderStatusRequest
+      description: |
+        Et dedikert request-objekt som kun inneholder det som skal endres — ikke
+        hele `Order`. Det gjør det umulig for en klient å ved et uhell skrive over
+        `createdAt` eller `customerName`.
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+
+    # --- Oppgave 1 + 3: response-objektet ---------------------------------
+    Order:
+      type: object
+      title: Order
+      description: En bestilling slik serveren svarer med den.
+      required:
+        - orderId
+        - coffeeId
+        - coffeeName
+        - customerName
+        - size
+        - quantity
+        - status
+        - createdAt
+        - updatedAt
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          example: '7f3f1f6e-9a0a-4e0c-9f5f-2f0a5a1d8b21'
+        coffeeId:
+          type: string
+          format: uuid
+          example: 'c0ffee01-0000-4000-8000-000000000001'
+        coffeeName:
+          type: string
+          description: Denormalisert fra menyen, slik at en klient kan vise ordren uten et ekstra kall.
+          example: 'Kaffe Latte'
+        customerName:
+          type: string
+          example: 'Ada'
+        size:
+          $ref: '#/components/schemas/CoffeeSize'
+        milkType:
+          $ref: '#/components/schemas/MilkType'
+        extraShot:
+          type: boolean
+          example: false
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 10
+          example: 1
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        createdAt:
+          type: string
+          format: date-time
+          example: '2026-09-13T09:41:12.004Z'
+        updatedAt:
+          type: string
+          format: date-time
+          example: '2026-09-13T09:41:20.118Z'
+
+    # --- Oppgave 6: RFC 7807 ---------------------------------------------
+    Problem:
+      type: object
+      title: Problem
+      description: |
+        Feilrespons etter RFC 7807 (Problem Details for HTTP APIs).
+        Sendes med `Content-Type: application/problem+json`.
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          description: URI som identifiserer feiltypen.
+          example: 'https://codeacademy.soprasteria.no/problems/validation-error'
+        title:
+          type: string
+          description: Kort, menneskelesbar oppsummering.
+          example: 'Ugyldig forespørsel'
+        status:
+          type: integer
+          example: 400
+        detail:
+          type: string
+          description: Forklaring knyttet til akkurat denne forekomsten.
+          example: 'customerName må være minst 2 tegn'
+        instance:
+          type: string
+          description: Stien som feilet.
+          example: '/orders'
+        errors:
+          type: array
+          description: Feltene som ikke validerte. Kun ved 400.
+          items:
+            $ref: '#/components/schemas/ValidationError'
+
+    ValidationError:
+      type: object
+      title: ValidationError
+      required: [field, message]
+      properties:
+        field:
+          type: string
+          description: Feltet som feilet, som en peker inn i requesten.
+          example: 'customerName'
+        message:
+          type: string
+          example: 'must not be blank'
+
+    Health:
+      type: object
+      title: Health
+      required: [status, rabbitmq, uptimeSeconds]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        rabbitmq:
+          type: string
+          description: Tilstanden på broker-tilkoblingen. API-et fungerer uansett verdi.
+          enum: [connected, disconnected, disabled]
+        uptimeSeconds:
+          type: number

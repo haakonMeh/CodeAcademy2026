@@ -1,0 +1,149 @@
+@host = http://localhost:5035
+
+### Menyen — Minimal API (oppgave 2)
+GET {{host}}/menu
+Accept: application/json
+
+### Alle bestillinger, nyeste først (oppgave 8)
+GET {{host}}/orders
+Accept: application/json
+
+### Filtrer på status (oppgave 8)
+GET {{host}}/orders?status=PENDING
+Accept: application/json
+
+### Paginer (oppgave 8)
+GET {{host}}/orders?limit=2&offset=1
+Accept: application/json
+
+### FEIL: limit over 100 -> 400 med Problem Details
+GET {{host}}/orders?limit=200
+Accept: application/json
+
+### FEIL: status som ikke finnes -> 400
+GET {{host}}/orders?status=NOPE
+Accept: application/json
+
+### Opprett bestilling -> 201 med Location-header (oppgave 1)
+# @name createOrder
+POST {{host}}/orders
+Content-Type: application/json
+
+{
+  "coffeeId": "c0ffee01-0000-4000-8000-000000000007",
+  "customerName": "Ada",
+  "size": "MEDIUM",
+  "milkType": "OAT",
+  "extraShot": false,
+  "quantity": 2
+}
+
+### Minste lovlige bestilling — quantity defaulter til 1 (oppgave 3 og 4)
+POST {{host}}/orders
+Content-Type: application/json
+
+{
+  "coffeeId": "c0ffee01-0000-4000-8000-000000000002",
+  "customerName": "Jonas",
+  "size": "SMALL"
+}
+
+### FEIL: blankt navn og for stort antall -> 400 med liste over feltene (oppgave 4)
+POST {{host}}/orders
+Content-Type: application/json
+
+{
+  "coffeeId": "c0ffee01-0000-4000-8000-000000000007",
+  "customerName": "  ",
+  "size": "MEDIUM",
+  "quantity": 99
+}
+
+### FEIL: enum-verdi som ikke finnes -> 400 (oppgave 3)
+POST {{host}}/orders
+Content-Type: application/json
+
+{
+  "coffeeId": "c0ffee01-0000-4000-8000-000000000007",
+  "customerName": "Ada",
+  "size": "HUGE"
+}
+
+### FEIL: kaffe som ikke finnes på menyen -> 404
+POST {{host}}/orders
+Content-Type: application/json
+
+{
+  "coffeeId": "00000000-0000-4000-8000-000000000000",
+  "customerName": "Ada",
+  "size": "SMALL"
+}
+
+### Hent én bestilling (oppgave 5) — seedet, status PENDING
+GET {{host}}/orders/0de50001-0000-4000-8000-000000000003
+Accept: application/json
+
+### Hent ordren du nettopp opprettet
+GET {{host}}/orders/{{createOrder.response.body.orderId}}
+Accept: application/json
+
+### FEIL: ukjent ordre -> 404 med Problem Details (oppgave 6)
+GET {{host}}/orders/00000000-0000-0000-0000-000000000000
+Accept: application/json
+
+### FEIL: ugyldig guid -> 404 i .NET, 400 i Java-sporet (oppgave 5, se FASIT.md)
+GET {{host}}/orders/ikke-en-guid
+Accept: application/json
+
+### Sett status med PATCH — den anbefalte varianten (oppgave 7)
+PATCH {{host}}/orders/0de50001-0000-4000-8000-000000000003
+Content-Type: application/json
+
+{
+  "status": "BREWING"
+}
+
+### Sett status med action-endepunktet — samme resultat (oppgave 7)
+POST {{host}}/orders/0de50001-0000-4000-8000-000000000003/status
+Content-Type: application/json
+
+{
+  "status": "READY"
+}
+
+### FEIL: status som ikke finnes -> 400
+PATCH {{host}}/orders/0de50001-0000-4000-8000-000000000003
+Content-Type: application/json
+
+{
+  "status": "DONE"
+}
+
+### FEIL: statusoppdatering på ukjent ordre -> 404
+PATCH {{host}}/orders/00000000-0000-0000-0000-000000000000
+Content-Type: application/json
+
+{
+  "status": "READY"
+}
+
+### Helsesjekk — Minimal API
+GET {{host}}/health
+Accept: application/json
+
+### Oppgave 10: med Bearer-token (krever Kaffebar:Auth:Enabled = true)
+# Lag et lokalt testtoken med:  dotnet user-jwts create --scope "api://kaffebar/access"
+# @name patchMedToken
+PATCH {{host}}/orders/0de50001-0000-4000-8000-000000000003
+Content-Type: application/json
+Authorization: Bearer <lim-inn-token-her>
+
+{
+  "status": "READY"
+}
+
+### Den genererte OpenAPI-spesifikasjonen (åpne i browser)
+# {{host}}/openapi/v1.json
+
+### Scalar UI (åpne i browser)
+# {{host}}/scalar/v1

@@ -1,0 +1,203 @@
+# Code Academy 2026 — lokalt miljø
+#
+# Standardoppsettet er det samling 4 trenger, og ingenting mer:
+#
+#   docker compose --profile java   up --build     # RabbitMQ + Kaffebar-API (Java)
+#   docker compose --profile dotnet up --build     # RabbitMQ + Kaffebar-API (.NET)
+#
+# Alt fra tidligere samlinger ligger bak egne profiler, slik at ingen bygger en
+# Next-app og to consumere de ikke skal bruke i dag:
+#
+#   --profile consumer      consumerne fra samling 2 (bonusoppgave i samling 4)
+#   --profile idempotweet   Idempotweet fra samling 1 + Postgres
+#   --profile frontend      kaffebar-web i container (bonusoppgave i samling 4)
+
+name: codeacademy
+
+services:
+  # --- Broker ---------------------------------------------------------------
+  # Den eneste tjenesten som alltid kjører. Liten, ingen bygg, opp på sekunder.
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    restart: unless-stopped
+
+  # --- Kaffebar API ---------------------------------------------------------
+  #
+  # Fasiten fra samling 3, containerisert. Velg sporet ditt:
+  #
+  #   docker compose --profile java   up --build
+  #   docker compose --profile dotnet up --build
+  #
+  # Begge lytter på 8080 og har nettverksaliaset «kaffebar-api» inne i
+  # compose-nettet, slik at frontenden peker samme sted uansett spor.
+  # Kjør bare én av dem om gangen — de deler port.
+
+  kaffebar-java:
+    container_name: kaffebar-api-java
+    profiles: ["java"]
+    build:
+      context: 3-APIs/kaffebar-java-solution
+    ports:
+      - "8080:8080"
+    environment:
+      # Hendelser og auto-barista er AV som standard i application.properties,
+      # fordi de er valgfrie siste steg i samling 3. I samling 4 er de poenget.
+      # Spring «relaxed binding»: kaffebar.events.enabled -> KAFFEBAR_EVENTS_ENABLED,
+      # kaffebar.barista.auto-enabled -> KAFFEBAR_BARISTA_AUTOENABLED (bindestrek faller bort).
+      - KAFFEBAR_EVENTS_ENABLED=true
+      - KAFFEBAR_EVENTS_EXCHANGE=kaffebar
+      - KAFFEBAR_BARISTA_AUTOENABLED=true
+      - KAFFEBAR_BARISTA_INTERVALMS=8000
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+    networks:
+      default:
+        aliases: [kaffebar-api]
+    depends_on:
+      - rabbitmq
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      start_period: 40s
+      retries: 5
+    restart: unless-stopped
+
+  kaffebar-dotnet:
+    container_name: kaffebar-api-dotnet
+    profiles: ["dotnet"]
+    build:
+      context: 3-APIs/kaffebar-dotnet-solution
+    ports:
+      - "8080:8080"
+    environment:
+      # Program.cs legger /openapi.json, /openapi/v1.json og /scalar bak
+      # IsDevelopment(). Det er riktig for et ekte API, men i workshopen er
+      # kontrakten hele poenget — så vi kjører containeren i Development.
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Kaffebar__Events__Enabled=true
+      - Kaffebar__Events__Exchange=kaffebar
+      - Kaffebar__Events__RabbitMqHost=rabbitmq
+      - Kaffebar__Barista__AutoEnabled=true
+      - Kaffebar__Barista__IntervalMs=8000
+    networks:
+      default:
+        aliases: [kaffebar-api]
+    depends_on:
+      - rabbitmq
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      start_period: 20s
+      retries: 5
+    restart: unless-stopped
+
+  # --- Frontenden (samling 4) ----------------------------------------------
+  #
+  # Bak en profil fordi Dockerfila er en bonusoppgave og er tom til den er
+  # skrevet. Under workshopen kjører frontenden med `yarn dev` på 3000.
+  #
+  #   docker compose --profile java --profile frontend up --build
+  #
+  kaffebar-web:
+    container_name: kaffebar-web
+    profiles: ["frontend"]
+    build:
+      context: 4-Frontend/kaffebar-web
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      # Inne i compose-nettverket heter API-et kaffebar-api, ikke localhost.
+      - KAFFEBAR_API_URL=http://kaffebar-api:8080
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+    # Ingen depends_on mot kaffebar-api: hvilken av de to som kjører avhenger av
+    # profilen, og compose kan ikke vente på en tjeneste som ikke er aktivert.
+    depends_on:
+      - rabbitmq
+    restart: unless-stopped
+
+  # --- Database -------------------------------------------------------------
+  # Brukes av Idempotweet og av consumerne — ikke av Kaffebar.
+  postgres:
+    container_name: postgres
+    image: postgres:17-alpine
+    profiles: ["idempotweet", "consumer"]
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=codeacademy
+      - POSTGRES_PASSWORD=codeacademy
+      - POSTGRES_DB=codeacademy
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # --- Samling 1: Idempotweet ----------------------------------------------
+  # Ligger bak profil, ellers ville den okkupert port 3000 — som er porten
+  # frontenden i samling 4 kjører på.
+  #
+  # NB: denne profilen bygger med 1-DevOps/2-Docker/Dockerfile, altså Dockerfila
+  # du skrev selv i samling 1. Har du ikke skrevet den, kopier inn
+  # Dockerfile-solution fra samme mappe først.
+  idempotweet:
+    container_name: idempotweet
+    profiles: ["idempotweet"]
+    build:
+      context: 1-DevOps/idempotweet
+      dockerfile: ../2-Docker/Dockerfile
+      args:
+        - NEXT_PUBLIC_ENABLE_IDEM_FORM=true
+        - NEXT_PUBLIC_SHOW_SEEDED_IDEMS=false
+    ports:
+      - "3100:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://codeacademy:codeacademy@postgres:5432/codeacademy
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      - postgres
+      - rabbitmq
+    restart: unless-stopped
+
+  # --- Samling 2: consumere -------------------------------------------------
+  # Velg ÉN — kjører begge, konkurrerer de om de samme meldingene.
+  #
+  #   docker compose --profile java --profile consumer up --build java-consumer
+  #
+  java-consumer:
+    container_name: java-consumer
+    profiles: ["consumer"]
+    build:
+      context: 2-EventDriven/java-consumer
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - DATABASE_URL=jdbc:postgresql://postgres:5432/codeacademy?user=codeacademy&password=codeacademy
+    depends_on:
+      - rabbitmq
+      - postgres
+    restart: unless-stopped
+
+  dotnet-consumer:
+    container_name: dotnet-consumer
+    profiles: ["consumer"]
+    build:
+      context: 2-EventDriven/dotnet-consumer
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - DATABASE_URL=Host=postgres;Port=5432;Database=codeacademy;Username=codeacademy;Password=codeacademy
+    depends_on:
+      - rabbitmq
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

@@ -1,0 +1,7 @@
+target/
+oppgave-9/
+.mvn/
+*.iml
+.idea/
+.vscode/
+.DS_Store
