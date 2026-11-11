@@ -15,6 +15,15 @@ public class Level2Tests(PostgresFixture fixture, ITestOutputHelper output) : IC
 
         var orders = await new KaffebarRepository(db).GetAllOrdersWithDetailsAsync();
 
+        var lines = orders.SelectMany(o => o.Lines).ToList();
+        output.Heading("Resultat");
+        output.Facts(
+            ("Ordrer", orders.Count),
+            ("Linjer", lines.Count),
+            ("Linjer med bønne og brenneri", lines.Count(l => l.Bean?.Roastery is not null)));
+        output.Commands(counter);
+        output.Tracked(db);
+
         Assert.All(orders, order => Assert.NotEmpty(order.Lines));
         Assert.All(orders.SelectMany(o => o.Lines), line => Assert.NotNull(line.Bean.Roastery));
         Assert.Equal(1, counter.SelectCount);
@@ -27,6 +36,13 @@ public class Level2Tests(PostgresFixture fixture, ITestOutputHelper output) : IC
         await using var db = fixture.CreateContext(output.WriteLine, counter);
 
         var receipts = await new KaffebarRepository(db).GetReceiptsAsync();
+
+        output.Heading("Resultat");
+        output.Facts(
+            ("Kvitteringer", receipts.Count),
+            ("Linjer", receipts.Sum(r => r.Lines.Count)));
+        output.Commands(counter);
+        output.Tracked(db);
 
         Assert.Equal(SeedData.OrderCount, receipts.Count);
         Assert.All(receipts, receipt => Assert.NotEmpty(receipt.Lines));
@@ -51,12 +67,17 @@ public class Level2Tests(PostgresFixture fixture, ITestOutputHelper output) : IC
 
         var result = await new KaffebarRepository(db).GetOrdersWithLinesAndHistoryAsync();
 
-        output.WriteLine($"\n{orders} ordrer, {lines} linjer, {history} statusendringer.");
-        output.WriteLine($"Databasen sendte {counter.RowsRead} rader i {counter.SelectCount} spørring(er).");
+        output.Heading("Dataene");
+        output.Facts(
+            ("Ordrer", orders),
+            ("Linjer", lines),
+            ("Statusendringer", history),
+            ("Rader med data totalt", orders + lines + history));
+        output.Commands(counter);
 
         Assert.All(result, order => Assert.NotEmpty(order.StatusHistory));
         Assert.All(result, order => Assert.NotEmpty(order.Lines));
         Assert.True(counter.RowsRead <= orders + lines + history,
-            $"{counter.RowsRead} rader for {orders + lines + history} rader med data. Hvor kommer resten fra?");
+            $"Databasen sendte {counter.RowsRead} rader for {orders + lines + history} rader med data.");
     }
 }

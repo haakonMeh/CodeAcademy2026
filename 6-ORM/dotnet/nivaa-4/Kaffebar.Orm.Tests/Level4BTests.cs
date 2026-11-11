@@ -7,6 +7,20 @@ namespace Kaffebar.Orm.Tests;
 /// <summary>Nivå 4: Den komplekse lesemodellen. Oppgave 4B.</summary>
 public class Level4BTests(PostgresFixture fixture, ITestOutputHelper output) : IClassFixture<PostgresFixture>
 {
+    private void PrintReport(string title, List<BeanSalesRow> report)
+    {
+        output.Heading(title);
+        output.Table(
+            ["Måned", "Brenneri", "Rang", "Bønne", "Kopper", "Omsetning"],
+            report.Select(r => new object?[] { r.Month.ToString("yyyy-MM"), r.Roastery, r.Rank, r.Bean, r.CupsSold, r.Revenue }));
+    }
+
+    private async Task<int> LinesInDatabaseAsync()
+    {
+        await using var db = fixture.CreateContext();
+        return await db.OrderLines.CountAsync();
+    }
+
     [Fact]
     public async Task Level4B_TopBeans_MatchesTheSameCalculationInCSharp()
     {
@@ -14,11 +28,19 @@ public class Level4BTests(PostgresFixture fixture, ITestOutputHelper output) : I
         await using var db = fixture.CreateContext(output.WriteLine, counter);
 
         var report = await new KaffebarRepository(db).GetTopBeansPerRoasteryPerMonthAsync();
+        var expected = await ExpectedReportAsync();
 
-        foreach (var row in report)
-            output.WriteLine($"{row.Month:yyyy-MM}  {row.Roastery,-18} #{row.Rank} {row.Bean,-15} {row.CupsSold,4} kopper {row.Revenue,9} kr");
+        PrintReport("Rapporten", report);
+        if (!report.SequenceEqual(expected))
+            PrintReport("Den samme rapporten regnet ut i C#", expected);
 
-        Assert.Equal(await ExpectedReportAsync(), report);
+        output.Heading("Resultat");
+        output.Facts(
+            ("Rader i rapporten", report.Count),
+            ("Linjer i databasen", await LinesInDatabaseAsync()));
+        output.Commands(counter);
+
+        Assert.Equal(expected, report);
         Assert.Equal(1, counter.SelectCount);
         // Databasen skal gjøre jobben: bare rapportradene kommer over nettverket, ikke alle linjene.
         Assert.Equal(report.Count, counter.RowsRead);
@@ -28,11 +50,17 @@ public class Level4BTests(PostgresFixture fixture, ITestOutputHelper output) : I
     public async Task Level4B_Bonus_AdoNet_GivesTheSameReport()
     {
         var counter = new QueryCounter();
-        await using var db = fixture.CreateContext(output.WriteLine, counter);
+        var logged = 0;
+        await using var db = fixture.CreateContext(s => { logged++; output.WriteLine(s); }, counter);
 
         var report = await new KaffebarRepository(db).GetTopBeansWithAdoNetAsync();
 
-        output.WriteLine($"{report.Count} rader. QueryCounter så {counter.SelectCount} spørring(er), og loggen over er tom. Hvorfor?");
+        output.Heading("Resultat");
+        output.Facts(
+            ("Rader i rapporten", report.Count),
+            ("Meldinger i SQL-loggen til EF", logged));
+        output.Commands(counter);
+
         Assert.Equal(await ExpectedReportAsync(), report);
     }
 

@@ -12,19 +12,23 @@ public class Level2CTests(PostgresFixture fixture, ITestOutputHelper output) : I
     public async Task Level2C_RegisterOrder_SavesTheLinesAndTheTotalPrice()
     {
         Guid orderId;
-        await using (var db = fixture.CreateContext(output.WriteLine))
+        var counter = new QueryCounter();
+        await using (var db = fixture.CreateContext(output.WriteLine, counter))
         {
             var beans = await db.Beans.OrderBy(b => b.Id).Select(b => b.Id).ToListAsync();
+            counter.Reset();
             orderId = await new KaffebarRepository(db).RegisterOrderAsync("Kari Kassatest",
             [
                 new NewLine("Espresso", CoffeeSize.Medium, 2, 55m, beans[0]),
                 new NewLine("Cortado", CoffeeSize.Medium, 1, 60m, beans[1])
             ]);
         }
+        output.Commands(counter, "Kommandoer fra RegisterOrderAsync");
 
         await using var fresh = fixture.CreateContext();
         var saved = await fresh.Orders.Include(o => o.Lines).SingleAsync(o => o.Id == orderId);
-        output.WriteLine($"\nI databasen: {saved.Lines.Count} linjer, totalpris {saved.TotalPrice} kr.");
+        output.Heading("I databasen etterpå");
+        output.Order(saved);
 
         Assert.Equal(2, saved.Lines.Count);
         Assert.Equal(170m, saved.TotalPrice);
@@ -37,23 +41,27 @@ public class Level2CTests(PostgresFixture fixture, ITestOutputHelper output) : I
         int mochaId;
         await using (var read = fixture.CreateContext())
         {
-            mochaId = await read.OrderLines
-                .Where(l => l.OrderId == SeedData.IngridOrderId && l.DrinkName == "Mocha")
-                .Select(l => l.Id)
-                .SingleAsync();
+            var before = await read.Orders.Include(o => o.Lines).SingleAsync(o => o.Id == SeedData.IngridOrderId);
+            mochaId = before.Lines.Single(l => l.DrinkName == "Mocha").Id;
+            output.Heading("Ingrid før");
+            output.Order(before);
+            output.Facts(("Linjen som skal fjernes", mochaId));
+            output.WriteLine("");
         }
 
-        await using (var db = fixture.CreateContext(output.WriteLine))
+        var counter = new QueryCounter();
+        await using (var db = fixture.CreateContext(output.WriteLine, counter))
         {
             await new KaffebarRepository(db).RemoveLineAsync(SeedData.IngridOrderId, mochaId);
         }
+        output.Commands(counter, "Kommandoer fra RemoveLineAsync");
 
         await using var fresh = fixture.CreateContext();
         var ingrid = await fresh.Orders.Include(o => o.Lines).SingleAsync(o => o.Id == SeedData.IngridOrderId);
-        output.WriteLine($"\nI databasen: {ingrid.Lines.Count} linje(r), totalpris {ingrid.TotalPrice} kr.");
+        output.Heading("Ingrid etterpå, i databasen");
+        output.Order(ingrid);
 
-        Assert.True(ingrid.Lines.All(l => l.Id != mochaId),
-            "Linjen ligger fortsatt i databasen, og det kom ingen feilmelding. Hva så RemoveLineAsync da den lette etter linjen?");
+        Assert.True(ingrid.Lines.All(l => l.Id != mochaId), $"Linje {mochaId} ligger fortsatt i databasen.");
         Assert.Equal(49m, ingrid.TotalPrice);
     }
 }

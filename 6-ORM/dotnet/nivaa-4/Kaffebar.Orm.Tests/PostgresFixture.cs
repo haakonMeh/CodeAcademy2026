@@ -16,6 +16,12 @@ namespace Kaffebar.Orm.Tests;
 /// </remarks>
 public class PostgresFixture : IAsyncLifetime
 {
+    /// <summary>
+    /// Sett til <c>false</c> for å skjule SQL-en EF sender. Advarslene fra EF og dataene testene skriver
+    /// ut vises fortsatt.
+    /// </summary>
+    private static readonly bool ShowSql = true;
+
     private PostgreSqlContainer? _container;
     private string? _externalAdminConnectionString;
     private string? _externalDatabase;
@@ -55,7 +61,23 @@ public class PostgresFixture : IAsyncLifetime
     /// <summary>En ny context. Gi den <paramref name="log"/> for å se SQL-en i testresultatet.</summary>
     public KaffebarDbContext CreateContext(
         Action<string>? log = null, QueryCounter? counter = null, bool lazyLoading = false) =>
-        KaffebarDb.Create(ConnectionString, log, counter, lazyLoading);
+        KaffebarDb.Create(ConnectionString, log is null || ShowSql ? log : WithoutSql(log), counter, lazyLoading);
+
+    private static Action<string> WithoutSql(Action<string> log) =>
+        message => { if (!message.StartsWith("Executed DbCommand")) log(message); };
+
+    /// <summary>
+    /// Ordrens versjon, <c>xmin</c>, rett fra databasen. Fungerer før du har lagt til
+    /// <c>Version</c> på <c>Order</c> i oppgave 4A.
+    /// </summary>
+    public async Task<uint> ReadVersionAsync(Guid orderId)
+    {
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("SELECT xmin::text::bigint FROM orders WHERE id = @id", connection);
+        command.Parameters.AddWithValue("id", orderId);
+        return (uint)(long)(await command.ExecuteScalarAsync())!;
+    }
 
     public async Task DisposeAsync()
     {

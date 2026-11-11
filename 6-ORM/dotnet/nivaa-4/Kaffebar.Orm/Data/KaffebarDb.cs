@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
 
 namespace Kaffebar.Orm.Data;
@@ -20,10 +21,13 @@ public static class KaffebarDb
             .UseSnakeCaseNamingConvention();
         if (logSql is not null)
         {
+            // SQL-en EF sender, og advarslene den gir om spørringene. Uten tidsstempel og
+            // kategori, så det er lett å lese i testresultatet.
             builder
-                .LogTo(logSql,
-                    [DbLoggerCategory.Database.Command.Name, DbLoggerCategory.Query.Name],
-                    LogLevel.Information)
+                .LogTo(
+                    (id, level) => id == RelationalEventId.CommandExecuted || id == RelationalEventId.CommandError
+                        || (level >= LogLevel.Warning && id.Name?.StartsWith(DbLoggerCategory.Query.Name) == true),
+                    data => logSql(data.LogLevel >= LogLevel.Warning ? $"{data.LogLevel}: {data.EventIdCode}\n{data}" : $"{data}"))
                 .EnableSensitiveDataLogging();
         }
 

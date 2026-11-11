@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
@@ -18,6 +19,8 @@ public class QueryCounter : DbCommandInterceptor
     private int _selectCount;
     private int _commandCount;
     private int _rowsRead;
+    private readonly ConcurrentQueue<ExecutedCommand> _commands = new();
+    private readonly ConcurrentDictionary<Guid, ExecutedCommand> _readers = new();
 
     /// <summary>Antall spørringer som leser, altså SELECT, også når de starter med en CTE (<c>WITH</c>).</summary>
     public int SelectCount => _selectCount;
@@ -28,17 +31,22 @@ public class QueryCounter : DbCommandInterceptor
     /// <summary>Antall rader databasen sendte tilbake, summert over alle spørringer.</summary>
     public int RowsRead => _rowsRead;
 
+    /// <summary>Hver kommando i den rekkefølgen den ble sendt, med SQL-en og det som kom tilbake.</summary>
+    public IReadOnlyCollection<ExecutedCommand> Commands => _commands;
+
     public void Reset()
     {
         Interlocked.Exchange(ref _selectCount, 0);
         Interlocked.Exchange(ref _commandCount, 0);
         Interlocked.Exchange(ref _rowsRead, 0);
+        _commands.Clear();
+        _readers.Clear();
     }
 
     public override InterceptionResult<DbDataReader> ReaderExecuting(
         DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result)
     {
-        Count(command);
+        Count(command, eventData.CommandId);
         return result;
     }
 
@@ -46,7 +54,7 @@ public class QueryCounter : DbCommandInterceptor
         DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result,
         CancellationToken cancellationToken = default)
     {
-        Count(command);
+        Count(command, eventData.CommandId);
         return ValueTask.FromResult(result);
     }
 
@@ -56,17 +64,17 @@ public class QueryCounter : DbCommandInterceptor
     // Npgsql sin egen NpgsqlDataReader tilbake, og da må vi holde fingrene av fatet.
     public override DbDataReader ReaderExecuted(
         DbCommand command, CommandExecutedEventData eventData, DbDataReader result) =>
-        IsQuery(command) ? new RowCountingReader(result, this) : result;
+        CountRows(eventData.CommandId, result);
 
     public override ValueTask<DbDataReader> ReaderExecutedAsync(
         DbCommand command, CommandExecutedEventData eventData, DbDataReader result,
         CancellationToken cancellationToken = default) =>
-        ValueTask.FromResult(IsQuery(command) ? new RowCountingReader(result, this) : result);
+        ValueTask.FromResult(CountRows(eventData.CommandId, result));
 
     public override InterceptionResult<int> NonQueryExecuting(
         DbCommand command, CommandEventData eventData, InterceptionResult<int> result)
     {
-        Count(command);
+        Count(command, eventData.CommandId);
         return result;
     }
 
@@ -74,14 +82,14 @@ public class QueryCounter : DbCommandInterceptor
         DbCommand command, CommandEventData eventData, InterceptionResult<int> result,
         CancellationToken cancellationToken = default)
     {
-        Count(command);
+        Count(command, eventData.CommandId);
         return ValueTask.FromResult(result);
     }
 
     public override InterceptionResult<object> ScalarExecuting(
         DbCommand command, CommandEventData eventData, InterceptionResult<object> result)
     {
-        Count(command);
+        Count(command, eventData.CommandId);
         return result;
     }
 
@@ -89,15 +97,28 @@ public class QueryCounter : DbCommandInterceptor
         DbCommand command, CommandEventData eventData, InterceptionResult<object> result,
         CancellationToken cancellationToken = default)
     {
-        Count(command);
+        Count(command, eventData.CommandId);
         return ValueTask.FromResult(result);
     }
 
-    private void Count(DbCommand command)
+    private void Count(DbCommand command, Guid commandId)
     {
         Interlocked.Increment(ref _commandCount);
+        var executed = new ExecutedCommand(command.CommandText);
+        _commands.Enqueue(executed);
         if (IsQuery(command))
+        {
             Interlocked.Increment(ref _selectCount);
+            _readers[commandId] = executed;
+        }
+    }
+
+    private DbDataReader CountRows(Guid commandId, DbDataReader result)
+    {
+        if (!_readers.TryRemove(commandId, out var executed))
+            return result;
+        executed.Columns = result.FieldCount;
+        return new RowCountingReader(result, this, executed);
     }
 
     private static bool IsQuery(DbCommand command)
@@ -107,22 +128,26 @@ public class QueryCounter : DbCommandInterceptor
             || sql.StartsWith("WITH", StringComparison.OrdinalIgnoreCase);
     }
 
-    private void RowRead() => Interlocked.Increment(ref _rowsRead);
+    private void RowRead(ExecutedCommand executed)
+    {
+        Interlocked.Increment(ref _rowsRead);
+        executed.RowRead();
+    }
 
     /// <summary>Sender alt videre til den ekte readeren, og teller radene på veien.</summary>
-    private sealed class RowCountingReader(DbDataReader inner, QueryCounter counter) : DbDataReader
+    private sealed class RowCountingReader(DbDataReader inner, QueryCounter counter, ExecutedCommand executed) : DbDataReader
     {
         public override bool Read()
         {
             var hasRow = inner.Read();
-            if (hasRow) counter.RowRead();
+            if (hasRow) counter.RowRead(executed);
             return hasRow;
         }
 
         public override async Task<bool> ReadAsync(CancellationToken cancellationToken)
         {
             var hasRow = await inner.ReadAsync(cancellationToken);
-            if (hasRow) counter.RowRead();
+            if (hasRow) counter.RowRead(executed);
             return hasRow;
         }
 
@@ -183,4 +208,21 @@ public class QueryCounter : DbCommandInterceptor
         public override TextReader GetTextReader(int ordinal) => inner.GetTextReader(ordinal);
         public override IEnumerator GetEnumerator() => ((IEnumerable)inner).GetEnumerator();
     }
+}
+
+/// <summary>Én kommando EF sendte til databasen.</summary>
+public sealed class ExecutedCommand(string sql)
+{
+    private int _rows;
+
+    /// <summary>SQL-en, slik den ble sendt. Fra <c>SaveChanges</c> kan det være flere setninger i én kommando.</summary>
+    public string Sql { get; } = sql;
+
+    /// <summary>Antall kolonner i svaret. 0 for kommandoer som ikke leser.</summary>
+    public int Columns { get; internal set; }
+
+    /// <summary>Antall rader databasen sendte tilbake. 0 for kommandoer som ikke leser.</summary>
+    public int Rows => _rows;
+
+    internal void RowRead() => Interlocked.Increment(ref _rows);
 }

@@ -45,15 +45,21 @@ public class Level4CTests(PostgresFixture fixture, ITestOutputHelper output) : I
         watch.Stop();
         var tracked = db.ChangeTracker.Entries().Count();
 
-        output.WriteLine($"{imported} ordrer med {OrderCount * 2} linjer på {watch.ElapsedMilliseconds} ms: " +
-                         $"{counter.CommandCount} kommandoer, {tracked} entiteter igjen i change trackeren.");
+        output.Heading("Resultat");
+        output.Facts(
+            ("Ordrer i fila", OrderCount),
+            ("Linjer i fila", OrderCount * 2),
+            ("Ordrer importert", imported),
+            ("Tid", $"{watch.ElapsedMilliseconds} ms"));
+        output.Commands(counter);
+        output.Tracked(db);
 
         await using var fresh = fixture.CreateContext();
         Assert.Equal(OrderCount, imported);
         Assert.Equal(OrderCount, await fresh.Orders.CountAsync(o => o.CustomerName.StartsWith("Nettkunde")));
         Assert.Equal(OrderCount * 2, await fresh.OrderLines.CountAsync(l => l.Order.CustomerName.StartsWith("Nettkunde")));
-        Assert.True(counter.CommandCount <= MaxCommands, $"{counter.CommandCount} kommandoer. Hvor mange ganger kalles SaveChanges?");
-        Assert.True(tracked <= MaxTrackedEntities, $"{tracked} entiteter ligger igjen i change trackeren.");
+        Assert.True(counter.CommandCount <= MaxCommands, $"{counter.CommandCount} kommandoer, maks {MaxCommands}.");
+        Assert.True(tracked <= MaxTrackedEntities, $"{tracked} entiteter igjen i change trackeren, maks {MaxTrackedEntities}.");
     }
 
     [Fact]
@@ -66,14 +72,20 @@ public class Level4CTests(PostgresFixture fixture, ITestOutputHelper output) : I
         var last = orders[^1];
         orders[^1] = last with { Lines = [last.Lines[0] with { BeanId = -1 }] };
 
+        DbUpdateException error;
         await using (var db = fixture.CreateContext())
         {
-            await Assert.ThrowsAsync<DbUpdateException>(() => new KaffebarRepository(db).ImportOrdersAsync(orders));
+            error = await Assert.ThrowsAsync<DbUpdateException>(() => new KaffebarRepository(db).ImportOrdersAsync(orders));
         }
 
         await using var fresh = fixture.CreateContext();
         var saved = await fresh.Orders.CountAsync(o => o.CustomerName.StartsWith("Halvferdig"));
-        output.WriteLine($"{saved} av {orders.Count} ordrer ble liggende i databasen etter feilen.");
+        output.Heading("Resultat");
+        output.Facts(
+            ("Ordrer i fila", orders.Count),
+            ("BeanId på siste linje", -1),
+            ("Feil", (error.InnerException ?? error).Message.Split('\n')[0]),
+            ("Ordrer lagret i databasen", saved));
         Assert.Equal(0, saved);
     }
 }

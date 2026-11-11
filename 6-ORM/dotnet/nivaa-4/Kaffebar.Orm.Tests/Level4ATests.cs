@@ -19,14 +19,26 @@ public class Level4ATests(PostgresFixture fixture, ITestOutputHelper output) : I
 
         var order1 = await barista1.GetOrderAsync(SeedData.JonasOrderId);
         var order2 = await barista2.GetOrderAsync(SeedData.JonasOrderId);
+        output.Heading("Begge baristaene leste Jonas");
+        output.Facts(("Status", order1!.Status), ("Versjon (xmin)", await fixture.ReadVersionAsync(SeedData.JonasOrderId)));
+        output.WriteLine("");
 
-        var first = await barista1.MarkAsPickedUpAsync(order1!);
+        var first = await barista1.MarkAsPickedUpAsync(order1);
+        var versionAfterFirst = await fixture.ReadVersionAsync(SeedData.JonasOrderId);
         var second = await barista2.MarkAsPickedUpAsync(order2!);
 
         await using var fresh = fixture.CreateContext();
+        var jonas = await fresh.Orders.FindAsync(SeedData.JonasOrderId);
         var pickups = await fresh.StatusChanges
             .CountAsync(s => s.OrderId == SeedData.JonasOrderId && s.Status == OrderStatus.PickedUp);
-        output.WriteLine($"\nBarista 1: {first}. Barista 2: {second}. Jonas har {pickups} PickedUp-rad(er) i historikken.");
+        output.Heading("Resultat");
+        output.Facts(
+            ("Barista 1", first),
+            ("Versjon (xmin) etter barista 1", versionAfterFirst),
+            ("Barista 2", second),
+            ("Jonas, Status i databasen", jonas!.Status),
+            ("Jonas, PickedUp-rader i historikken", pickups));
+        output.Tracked(db2, "Change trackeren til barista 2");
 
         Assert.Equal(PickupResult.PickedUp, first);
         Assert.Equal(PickupResult.Conflict, second);
@@ -34,8 +46,7 @@ public class Level4ATests(PostgresFixture fixture, ITestOutputHelper output) : I
 
         // Etter konflikten skal barista 2 sin context være ryddet: ingenting igjen å lagre.
         Assert.False(db2.ChangeTracker.HasChanges(),
-            "Barista 2 sin context har fortsatt ulagrede endringer. Neste SaveChanges vil prøve igjen:\n" +
-            db2.ChangeTracker.DebugView.ShortView);
+            "Barista 2 sin context har ulagrede endringer:\n" + db2.ChangeTracker.DebugView.ShortView);
     }
 
     [Fact]
@@ -45,7 +56,11 @@ public class Level4ATests(PostgresFixture fixture, ITestOutputHelper output) : I
         var repository = new KaffebarRepository(db);
 
         var ingrid = await repository.GetOrderAsync(SeedData.IngridOrderId);
+        var result = await repository.MarkAsPickedUpAsync(ingrid!);
 
-        Assert.Equal(PickupResult.NotReady, await repository.MarkAsPickedUpAsync(ingrid!));
+        output.Heading("Resultat");
+        output.Facts(("Ingrid, Status", ingrid!.Status), ("MarkAsPickedUpAsync", result));
+
+        Assert.Equal(PickupResult.NotReady, result);
     }
 }

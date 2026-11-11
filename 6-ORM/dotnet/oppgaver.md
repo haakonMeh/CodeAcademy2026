@@ -28,6 +28,7 @@ Alle bør gjøre **Forarbeidet** først. Det tar et kvarter, og det er der du f�
 
 Omtrentlig tid per nivå, inkludert refleksjon i par: nivå 1 ca. 45 min, nivå 2 ca. 90 min, nivå 3 ca.
 75 min og nivå 4 ca. 90 min. Oppgaver merket *bonus* er valgfrie. Ta dem hvis du har tid til overs.
+Er du ferdig før tiden, finnes det også [valgfrie oppgaver](#valgfrie-oppgaver) som ikke hører til noe nivå.
 
 Hvert nivå ligger i sin egen mappe (`nivaa-1`, `nivaa-2`, …) og er et selvstendig .NET-prosjekt. Mappen
 for et nivå inneholder løsningen på nivået før, så du kan starte hvor du vil.
@@ -204,8 +205,19 @@ grønne. Noen feiler med `NotImplementedException`, andre fordi en kollega har s
 i. README-en i hver mappe sier hvor mange grønne og røde tester du skal starte med.
 
 ### Se hva som skjer
-Testene skriver SQL, kvitteringer og antall spørringer til testresultatet. For å se det, filtrerer
-du på et nivå eller en oppgave (`Level1`, `Level1A` …) og skrur opp detaljnivået:
+Testene skriver SQL-en EF sender mens de kjører, og til slutt dataene du trenger for å forstå
+oppgaven, i faste seksjoner:
+
+- **`── Resultat`** (eller **`── I databasen etterpå`**): det testen sjekker, for eksempel antall
+  linjer på kvitteringene eller prisen som faktisk ble lagret.
+- **`── Kommandoer til databasen`**: hver setning EF sendte, gruppert på type og tabell. For en
+  `SELECT` står tabellene den leser, og hvor mange kolonner og rader som kom tilbake. For en `UPDATE`
+  står kolonnene den skriver. Under tabellen står antall rundturer til databasen og rader lest.
+- **`── Change trackeren`**: entitetene contexten følger med på, gruppert på type og tilstand
+  (`Unchanged`, `Modified`, `Added` …).
+
+Hver oppgave sier hva du skal se etter. For å se utskriften, filtrerer du på et nivå eller en oppgave
+(`Level1`, `Level1A` …) og skrur opp detaljnivået:
 
 ```bash
 dotnet test --filter Level1 --logger "console;verbosity=detailed"
@@ -214,13 +226,18 @@ dotnet test --filter Level1 --logger "console;verbosity=detailed"
 Eller bruk test-runneren i Rider, Visual Studio eller VS Code (C# Dev Kit). Den viser output per
 test.
 
+Blir det for mye SQL å lese, setter du `ShowSql` øverst i `Kaffebar.Orm.Tests/PostgresFixture.cs` til
+`false`. Da forsvinner SQL-en, mens advarslene fra EF og seksjonene over står igjen. Sett den tilbake
+til `true` når oppgaven ber deg se på SQL-en.
+
 ### Bli kjent
 1. `Kaffebar.Orm/Data/KaffebarDbContext.cs`: modellen. Hvilke tabeller blir det? Hvorfor lagres
    enumene som tekst?
 2. `Kaffebar.Orm/Data/KaffebarDb.cs`: det ene stedet en context blir konfigurert. `LogTo(...)` er
    EF sin SQL-logging, som loggeren `org.hibernate.SQL` i Hibernate.
 3. `Kaffebar.Orm/Data/QueryCounter.cs`: en `DbCommandInterceptor` som teller spørringer, kommandoer
-   og rader. Den er kveldens måleinstrument, og du trenger ikke å endre den.
+   og rader, og husker SQL-en til hver kommando. Den er kveldens måleinstrument, og du trenger ikke
+   å endre den.
 4. Prøv `ToQueryString()`: legg `using Microsoft.EntityFrameworkCore;` øverst i `Level1Tests.cs` og
    `output.WriteLine(db.Orders.Where(o => o.CustomerName == "Ada").ToQueryString());` inn i en test,
    og se SQL-en *uten* å kjøre den.
@@ -248,7 +265,8 @@ brente den.
 2. Åpne `Kaffebar.Orm/Receipts.cs` og skriv `Write(...)`: for hver ordre, skriv kunde, status og
    totalpris. For hver linje, naviger ned til brenneriet (`order.Lines` → `line.Bean` →
    `bean.Roastery.Name`) og skriv det ut med `write(...)`.
-3. Kjør `Level1A_NaiveQuery_ReturnsOrdersWithoutLines` og se på outputen.
+3. Kjør `Level1A_NaiveQuery_ReturnsOrdersWithoutLines` og se på outputen: kvitteringene, og
+   `Linjer på kvitteringene` mot `Linjer i databasen` under `── Resultat`.
 
 Testen blir grønn. Men se på kvitteringene: **det er ingen kaffe på dem.** Ingen exception,
 ingen advarsel. 100 kvitteringer med kundenavn og pris, og ingen linjer.
@@ -262,14 +280,15 @@ ingen advarsel. 100 kvitteringer med kundenavn og pris, og ingen linjer.
 1. Åpne `Kaffebar.Orm/Data/KaffebarDb.cs` og finn `TODO 1B`. Skru på lazy loading med
    `UseLazyLoadingProxies()`. Pakken er allerede installert.
 2. Kjør `Level1B_LazyLoading_FillsTheReceipts_OneQueryAtATime` (den bruker `lazyLoading: true`).
-3. Kvitteringene har kaffe nå. Se på loggen og på tallet til slutt.
+3. Kvitteringene har kaffe nå. Se på SQL-en som dukker opp *mellom* kvitteringene, og på tabellen
+   under `── Kommandoer til databasen`: hvilke tabeller ble lest, og hvor mange ganger?
 
 > 💡 Se på `Domain/Order.cs`: alle navigasjonene er `virtual`. Lazy loading i EF Core lager en
 > *proxy*, en subklasse av entiteten din generert under kjøring, som overstyrer navigasjonene og
 > laster data i det du rører dem. Uten `virtual` får den ikke overstyrt noe, og EF nekter å starte.
 
 > 🤔 **Refleksjon i par:**
-> * Hvor mange SQL-spørringer ble kjørt for 100 ordrer? Tell dem i loggen og sammenlign med tallet.
+> * Hvor mange SQL-spørringer ble kjørt for 100 ordrer? Hvilken tabell står for de fleste?
 > * Den naive gjetningen er 1 + 100 + 250 + 250: én for ordrene, én per ordre for linjene (en
 >   samling lastes i én spørring per *ordre*, ikke per linje), og så én per linje for bønnen og én
 >   for brenneriet. Hvorfor ble det så mye færre? (Hint: Identity Map.)
@@ -313,7 +332,8 @@ Så samme kvittering på den andre måten, med en projeksjon:
 4. Skriv `GetReceiptsAsync()` i samme fil. Den bygger `ReceiptDto` (se `Dtos.cs`) direkte i spørringen
    med `Select`, uten `Include`.
 5. Kjør `Level2A_Projection_LoadsTheWholeReceiptInOneQuery` og sammenlign SQL-en med den fra
-   `Include`. Hvilke kolonner hentes nå?
+   `Include`. Hvilke kolonner hentes nå? Sammenlign også `Kolonner` under
+   `── Kommandoer til databasen` og `── Change trackeren` i de to testene.
 6. Testen sjekker også at change trackeren er tom. Hvorfor er den det?
 7. Hibernate kan skille *hva* du henter fra *hvordan* med en `EntityGraph`. EF har ikke det, men du kan
    flytte `Include`-kjeden til en utvidelsesmetode, `WithReceiptDetails(this IQueryable<Order> q)`. Hva
@@ -323,8 +343,9 @@ Så samme kvittering på den andre måten, med en projeksjon:
 1. Åpne `Kaffebar.Orm/KaffebarRepository.Level2B.cs` og skriv `GetOrdersWithLinesAndHistoryAsync()`,
    som tar med *både* `Lines` (helt ned til brenneri) *og* `StatusHistory`. Skriv den rett fram
    med to `Include` først.
-2. Kjør `Level2B_TwoCollections_DoNotMultiplyTheRows`. Se på antall rader databasen sendte, og på
-   advarselen i loggen (`MultipleCollectionIncludeWarning`).
+2. Kjør `Level2B_TwoCollections_DoNotMultiplyTheRows`. Sammenlign `Rader med data totalt` under
+   `── Dataene` med `Rader` under `── Kommandoer til databasen`, og se på advarselen i loggen
+   (`MultipleCollectionIncludeWarning`).
 3. Fiks det, og se at antall spørringer og rader endrer seg.
 
 ### 2C: Kassa-appen skriver
@@ -340,10 +361,11 @@ Til nå har vi bare lest. Kassa-appen må også registrere bestillinger og fjern
 angrer. En kollega har skrevet `Kaffebar.Orm/KaffebarRepository.Level2C.cs`.
 
 1. Kjør `dotnet test --filter Level2C --logger "console;verbosity=detailed"`. Begge testene er røde.
-2. `RegisterOrderAsync` lagrer linjene, men totalprisen blir 0. Lag en domenemetode `Order.AddLine(...)`
-   i `Domain/Order.cs` som holder totalprisen riktig, og bruk den.
-3. `RemoveLineAsync` kjører uten feil, men linjen ligger fortsatt i databasen. Hvorfor? (Hint: hva
-   inneholder `order.Lines` her? Du har sett det før.)
+2. `RegisterOrderAsync` lagrer linjene, men totalprisen blir 0: se `TotalPrice` mot `Sum av linjene`
+   under `── I databasen etterpå`. Lag en domenemetode `Order.AddLine(...)` i `Domain/Order.cs` som
+   holder totalprisen riktig, og bruk den.
+3. `RemoveLineAsync` kjører uten feil, men linjen ligger fortsatt i databasen. Se hvilke kommandoer
+   den sendte. Hvorfor? (Hint: hva inneholder `order.Lines` her? Du har sett det før.)
 4. Få testen grønn: last det du trenger, og lag en domenemetode `Order.RemoveLine(...)` som holder både
    samlingen og totalprisen i orden.
 5. Eksperiment: bruk `db.OrderLines.Remove(line)` i stedet for domenemetoden. Blir linjen slettet? Hva
@@ -419,9 +441,10 @@ Så flytter baristaen Karis ordre videre med `UpdateStatusAsync` (i `KaffebarRep
 metode som var ferdig skrevet og som ikke har noe med kampanjen å gjøre. *Den* kaller
 `SaveChanges()`.
 
-3. Finn `DebugView` i test-outputen. Du skal se noe som
+3. Finn `── Change trackeren før baristaen lagrer` i test-outputen. Du skal se noe som
    `Order {Id: 0de50001-…-000000000004} Modified` og `TotalPrice: 192.10 Modified Originally 226.00`.
-   Hvem ba om at den skulle lagres?
+   Se så på `── Kommandoer fra UpdateStatusAsync (Kari)`. Hvem ba om at den skulle lagres?
+   Change trackeren står også i de to testene som er grønne. Hvilken tilstand har ordren der?
 4. **Refaktorer** slik at kampanjekvitteringen aldri kan mutere databasen, uansett hva andre kaller
    senere. Alle tre testene for 3A skal være grønne.
    * Les uten tracking, eller aller helst: projiser bare det du trenger (id, navn, pris og om
@@ -448,8 +471,9 @@ noe API, men feilene er de samme, for de oppstår når entiteten blir til JSON. 
 `GetOrderJsonAsync` i `Kaffebar.Orm/KaffebarRepository.Level3B.cs`, og formatet kassa-appen forventer,
 står i kommentaren over metoden.
 
-1. Kjør `dotnet test --filter Level3B --logger "console;verbosity=detailed"`. Hva står i JSON-en? Hvor
-   er linjene, og hva betyr `"status":0`? Det kom ingen feilmelding.
+1. Kjør `dotnet test --filter Level3B --logger "console;verbosity=detailed"`. Sammenlign
+   `── Kassa-appen forventer` med `── GetOrderJsonAsync ga`. Hvor er linjene, og hva betyr
+   `"status": 0`? Det kom ingen feilmelding.
 2. Prøv den «åpenbare» løsningen: `Include` alt, og serialiser fortsatt entiteten. Hva skjer nå? (Hint:
    `OrderLine.Order`.)
 3. Gjør det riktig: lag `record`-er med formatet fra kommentaren, og projiser rett inn i dem. Tenk på
@@ -477,9 +501,9 @@ har kunden hentet.
 1. Åpne `Kaffebar.Orm/KaffebarRepository.Level3C.cs` og skriv `PickUpStaleOrdersAsync(DateTimeOffset cutoff)`
    først med en løkke: hent de sporede `Ready`-ordrene, sett `PickedUp`, legg til en `StatusChange`
    på hver, og `SaveChangesAsync()`.
-2. Kjør `Level3C_StaleReadyOrders_ArePickedUp_AndTheHistoryIsKept`. Testen skriver ut tre tall:
-   antall kommandoer, antall rader lest inn i minnet og antall entiteter contexten sporer. Noter dem.
-3. Skriv den om med `ExecuteUpdateAsync`, og sammenlign de tre tallene.
+2. Kjør `Level3C_StaleReadyOrders_ArePickedUp_AndTheHistoryIsKept`. Noter tre tall fra outputen:
+   `Rundturer til databasen`, `Rader lest` og `Sporet totalt`, og se hvilke setninger som ble sendt.
+3. Skriv den om med `ExecuteUpdateAsync`, og sammenlign de tre tallene og setningene.
 4. Testen krever at historikken er med: hver ordre skal få en `PickedUp`-rad i `StatusHistory`.
    Hvordan får du til det uten å laste entitetene? (Hint:
    `db.Database.ExecuteSqlAsync($"INSERT … SELECT …")` finnes.) Og hvordan sørger du for at
@@ -508,10 +532,10 @@ Kassa-appen henter en bestilling, endrer status og sender den inn igjen til `Sav
 endringer automatisk».
 
 1. Kjør `dotnet test --filter Level3D --logger "console;verbosity=detailed"`. Ble endringen lagret? Fikk
-   du noen feilmelding?
+   du noen feilmelding? Se `── Kommandoer fra SaveOrderAsync`.
 2. Prøv `db.Update(order)` før `SaveChangesAsync`. Den første testen blir grønn, men den andre er rød.
-   Se på `UPDATE`-setningen i loggen. Hvilke kolonner skriver den? Hvor ble det av prisen noen andre
-   satte?
+   Se på `UPDATE`-setningen under `── Kommandoer fra SaveOrderAsync`. Hvilke kolonner skriver den? Hvor
+   ble det av prisen noen andre satte?
 3. Få begge testene grønne. Trenger du egentlig hele objektet? Se på hva som allerede finnes i
    `KaffebarRepository.cs`.
 
@@ -544,8 +568,9 @@ To baristaer ser at Jonas sin espresso er klar. Begge roper navnet hans og marke
 hentet, på nøyaktig samme tidspunkt.
 
 1. Kjør `Level4A_TwoBaristas_OnlyOneCanHandOutTheCoffee` først, uten å endre noe. Testen bruker to
-   contexter (to baristaer) mot samme ordre. Hvorfor feiler den? Hvor mange `PickedUp`-rader fikk
-   Jonas i historikken? Dette er *last write wins*.
+   contexter (to baristaer) mot samme ordre. Hvorfor feiler den? Se `── Resultat`: hva svarte hver
+   barista, hvor mange `PickedUp`-rader fikk Jonas i historikken, og hva skjedde med versjonen
+   (`xmin`) mellom dem? Dette er *last write wins*.
 2. Legg til et versjonsfelt i `Kaffebar.Orm/Domain/Order.cs`:
    ```csharp
    using System.ComponentModel.DataAnnotations;   // øverst i fila
@@ -566,8 +591,8 @@ hentet, på nøyaktig samme tidspunkt.
    `MarkAsPickedUpAsync` i `Kaffebar.Orm/KaffebarRepository.Level4A.cs` og returner
    `PickupResult.Conflict`.
 5. Til slutt sjekker testen at barista 2 sin context er *ryddet*:
-   `Assert.False(db2.ChangeTracker.HasChanges(), …)`. Feiler den, skriver den ut
-   `DebugView.ShortView` av det som fortsatt venter på å bli lagret. Hva ligger igjen i change
+   `Assert.False(db2.ChangeTracker.HasChanges(), …)`. Se `── Change trackeren til barista 2`, og
+   feilmeldingen, som viser `DebugView.ShortView` av det som fortsatt venter på å bli lagret. Hva ligger igjen i change
    trackeren etter en feilet `SaveChanges`? (Hint: den nye `StatusChange`-en, og ordren slik
    barista 2 tror den er. `ReloadAsync()` finnes.)
 
@@ -579,8 +604,8 @@ et parameter.
 6. Skriv `MarkAsPickedUpAsync(Guid orderId, uint expectedVersion)` i samme fil. Prøv først det som ser
    riktig ut: hent ordren, sett `order.Version = expectedVersion` og kall metoden fra steg 4.
 7. Kjør `dotnet test --filter Level4AClient --logger "console;verbosity=detailed"`. Klienten med gammel
-   versjon får `PickedUp`, ikke `Conflict`. Se på `WHERE xmin = @p2` i loggen og verdien til `@p2`. Hvilken
-   versjon sjekket EF mot?
+   versjon får `PickedUp`, ikke `Conflict`. Se på `WHERE xmin = @p2` i loggen og verdien til `@p2`, og
+   sammenlign med `Versjon klienten så` og `Versjon i databasen nå`. Hvilken versjon sjekket EF mot?
 8. EF sammenligner med *originalverdien*, altså det den leste fra databasen. Sett den i stedet:
    `db.Entry(order).Property(o => o.Version).OriginalValue = expectedVersion`.
 
@@ -617,7 +642,7 @@ og masse unødvendig trafikk.
 2. Kjør `Level4B_TopBeans_MatchesTheSameCalculationInCSharp`. Testen regner ut den samme rapporten
    på den tunge måten (alle linjene inn i minnet, LINQ to Objects) og sammenligner. Din versjon skal
    gjøre det i **én** spørring, og bare rapportradene skal over nettverket: testen sjekker at antall
-   rader databasen sendte, er lik antall rader i rapporten. Å hente alle linjene og regne i C#
+   rader databasen sendte (`Rader lest`), er lik antall rader i rapporten (`Rader i rapporten`). Å hente alle linjene og regne i C#
    feiler derfor.
 
 Detaljer testen er nøye på:
@@ -675,6 +700,260 @@ Nettbutikken sender 1000 bestillinger med 2 linjer hver i én fil. En kollega ha
 >   `Bean`-objektet?
 > * Når ville du droppet EF helt for en import, og brukt for eksempel `COPY` i Postgres
 >   (`BeginBinaryImport` i Npgsql)?
+
+---
+
+## Valgfrie oppgaver
+
+For deg som blir ferdig før tiden, eller vil grave dypere. De hører ikke til noe nivå, og du trenger
+dem ikke for å gjøre resten. Hver oppgave sier hvilket nivå den passer etter. Du gjør dem i mappen du
+allerede jobber i.
+
+Alt du lager her, er merket som valgfritt: filene, klassene, testene og migreringene heter
+`Optional…`, og hver fil har en kommentar øverst. Da skiller de seg fra kursets egne filer, og
+`dotnet test --filter Optional --logger "console;verbosity=detailed"` kjører bare dem.
+
+### Valgfri 1: Kan ikke oversettes (passer etter nivå 1)
+
+**Bakgrunn:** Sjefen lurer på hvor mange bestillinger som kommer i helgene.
+
+1. Lag `Kaffebar.Orm/KaffebarRepository.Optional1.cs`, med en metode som ser helt rimelig ut:
+   ```csharp
+   using Kaffebar.Orm.Domain;
+   using Microsoft.EntityFrameworkCore;
+
+   namespace Kaffebar.Orm;
+
+   // Valgfri oppgave 1: Kan ikke oversettes. Ikke en del av nivåene.
+   public partial class KaffebarRepository
+   {
+       private static bool IsWeekend(DateTimeOffset time) =>
+           time.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+
+       /// <summary>Ordrene som ble lagt inn en lørdag eller søndag (UTC).</summary>
+       public Task<List<Order>> GetWeekendOrdersAsync() =>
+           db.Orders.Where(o => IsWeekend(o.CreatedAt)).ToListAsync();
+   }
+   ```
+2. Lag `Kaffebar.Orm.Tests/Optional1Tests.cs`:
+   ```csharp
+   using Kaffebar.Orm.Data;
+   using Microsoft.EntityFrameworkCore;
+   using Xunit.Abstractions;
+
+   namespace Kaffebar.Orm.Tests;
+
+   /// <summary>Valgfri oppgave 1: Kan ikke oversettes. Ikke en del av nivåene.</summary>
+   public class Optional1Tests(PostgresFixture fixture, ITestOutputHelper output) : IClassFixture<PostgresFixture>
+   {
+       [Fact]
+       public async Task Optional1_WeekendOrders_AreFilteredInTheDatabase()
+       {
+           var counter = new QueryCounter();
+           await using var db = fixture.CreateContext(output.WriteLine, counter);
+
+           var weekend = await new KaffebarRepository(db).GetWeekendOrdersAsync();
+
+           await using var check = fixture.CreateContext();
+           var all = await check.Orders.ToListAsync();
+           output.Heading("Resultat");
+           output.Facts(
+               ("Ordrer i databasen", all.Count),
+               ("Helgeordrer", weekend.Count));
+           output.Commands(counter);
+
+           Assert.Equal(all.Count(o => o.CreatedAt.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday), weekend.Count);
+           // Databasen skal filtrere: bare helgeordrene kommer over nettverket.
+           Assert.Equal(weekend.Count, counter.RowsRead);
+       }
+   }
+   ```
+3. Kjør `dotnet test --filter Optional1 --logger "console;verbosity=detailed"`. Les feilmeldingen. Hva
+   prøvde EF å gjøre med `IsWeekend`?
+4. Feilmeldingen foreslår selv en vei ut: hent med `ToListAsync()` først, og filtrer i C# etterpå. Prøv
+   det. Testen er fortsatt rød. Sammenlign `Helgeordrer` med `Rader` under
+   `── Kommandoer til databasen`.
+5. Få testen grønn: skriv filteret slik at EF kan oversette det til SQL. Hva kan EF gjøre med
+   `o.CreatedAt.DayOfWeek` direkte? Se på `WHERE` i SQL-en.
+
+> 🤔 **Refleksjon i par:**
+> * EF Core kaster en exception i stedet for å filtrere i C# for deg. Hvorfor er det et bedre valg?
+> * Hvilken tidssone er «helg» i? Finn svaret i SQL-en.
+> * Når er det helt greit å hente alt og regne i C#?
+
+### Valgfri 2: Testen som stopper N+1 (passer etter nivå 2)
+
+**Bakgrunn:** I 2A fikk du kvitteringene ned i én spørring. Om et halvt år fjerner noen en
+`ThenInclude` i en refaktorering, og ingen merker det før kvitteringene går tregt i produksjon. Skriv
+testen som stopper det. Java-sporet har den samme oppgaven.
+
+1. Lag `Kaffebar.Orm.Tests/Optional2Tests.cs`:
+   ```csharp
+   using Kaffebar.Orm.Data;
+   using Xunit.Abstractions;
+
+   namespace Kaffebar.Orm.Tests;
+
+   /// <summary>Valgfri oppgave 2: en test som stopper N+1 før den når produksjon. Ikke en del av nivåene.</summary>
+   public class Optional2Tests(PostgresFixture fixture, ITestOutputHelper output) : IClassFixture<PostgresFixture>
+   {
+       [Fact]
+       public async Task Optional2_Receipts_StayAtOneQuery()
+       {
+           // Skriv testen her.
+       }
+   }
+   ```
+2. Skriv testen: hent ordrene med `GetAllOrdersWithDetailsAsync()`, gå gjennom alt med
+   `Receipts.Write(orders, _ => { })`, og sjekk antall spørringer med en `QueryCounter`. Se hvordan
+   `Level2Tests` gjør det. `output.Commands(counter)` skriver ut tabellen.
+3. Kjør den. Er den grønn?
+4. Fjern `.ThenInclude(b => b.Roastery)` i `KaffebarRepository.Level2A.cs`, og kjør testen igjen. Ble den
+   rød, og hva sier feilmeldingen? Prøv så med `lazyLoading: true` i `CreateContext`. Hvilken
+   feilmelding forteller best hva som er galt?
+5. Sett `ThenInclude` tilbake.
+
+> 🤔 **Refleksjon i par:**
+> * Hva bør feilmeldingen si, slik at den som får testen rød om et halvt år, skjønner hva som skjedde?
+> * Hvilke andre metoder i et ekte prosjekt fortjener en slik test?
+
+### Valgfri 3: Gammel data fra Identity Map (passer etter nivå 3)
+
+**Bakgrunn:** En context lever gjerne gjennom en hel request, eller mye lenger. Hva ser den hvis noen
+andre endrer en rad mens den lever?
+
+1. Lag `Kaffebar.Orm.Tests/Optional3Tests.cs`:
+   ```csharp
+   using Kaffebar.Orm.Data;
+   using Microsoft.EntityFrameworkCore;
+   using Xunit.Abstractions;
+   using static Kaffebar.Orm.Tests.Print;
+
+   namespace Kaffebar.Orm.Tests;
+
+   /// <summary>Valgfri oppgave 3: gammel data fra Identity Map. Ikke en del av nivåene.</summary>
+   public class Optional3Tests(PostgresFixture fixture, ITestOutputHelper output) : IClassFixture<PostgresFixture>
+   {
+       [Fact]
+       public async Task Optional3_SecondRead_SeesWhatOthersSaved()
+       {
+           var counter = new QueryCounter();
+           await using var db = fixture.CreateContext(output.WriteLine, counter);
+           var first = await db.Orders.SingleAsync(o => o.Id == SeedData.AdaOrderId);
+
+           // Mens contexten lever, endrer noen andre prisen.
+           await using (var other = fixture.CreateContext())
+           {
+               (await other.Orders.SingleAsync(o => o.Id == SeedData.AdaOrderId)).TotalPrice = 60m;
+               await other.SaveChangesAsync();
+           }
+
+           var second = await db.Orders.SingleAsync(o => o.Id == SeedData.AdaOrderId);
+
+           output.Heading("Resultat");
+           output.Facts(
+               ("Første lesing, TotalPrice", Kr(first.TotalPrice)),
+               ("Andre lesing, TotalPrice", Kr(second.TotalPrice)),
+               ("Samme objekt", ReferenceEquals(first, second)),
+               ("I databasen, TotalPrice", Kr(60m)));
+           output.Commands(counter);
+
+           Assert.Equal(60m, second.TotalPrice);
+       }
+   }
+   ```
+2. Kjør `dotnet test --filter Optional3 --logger "console;verbosity=detailed"`. Se på `── Resultat` og
+   `── Kommandoer til databasen`. Ble det sendt en ny spørring? Hvorfor har Ada fortsatt den gamle prisen?
+3. Få testen grønn uten å endre det den andre contexten gjør. Finn minst to måter.
+4. Bytt den andre lesingen til `await db.Orders.FindAsync(SeedData.AdaOrderId)`. Hvor mange spørringer
+   ble det nå?
+
+> 🤔 **Refleksjon i par:**
+> * I 1B sparte Identity Map deg for mange spørringer. Her gir den deg gammel data. Er det den samme
+>   mekanismen?
+> * I ASP.NET Core lever en context i én request. Hvor stort er problemet der, og hvor stort er det i en
+>   context som lever lenge, for eksempel i en bakgrunnsjobb?
+> * Hvordan henger dette sammen med 4A?
+
+### Valgfri 4: Migreringen som mister data (passer etter nivå 4)
+
+**Bakgrunn:** I 4A leste du SQL-en en migrering blir til. Her ser du hvorfor det er en vane verdt å ha.
+Du jobber i `nivaa-4`.
+
+1. Legg til en kommentar fra kunden på `Order` i `Kaffebar.Orm/Domain/Order.cs`, og lag en migrering:
+   ```csharp
+   // Valgfri oppgave 4.
+   public string? Note { get; set; }
+   ```
+   ```bash
+   dotnet ef migrations add Optional4AddOrderNote --project Kaffebar.Orm
+   ```
+2. Produkteieren vil heller kalle den `Comment`. Gi egenskapen nytt navn, lag en migrering og les den.
+   Hva gjettet EF?
+   ```bash
+   dotnet ef migrations add Optional4Experiment --project Kaffebar.Orm
+   ```
+   Fjern så eksperimentet igjen. `--force` gjør at EF ikke prøver å spørre en database om migreringen
+   er tatt i bruk:
+   ```bash
+   dotnet ef migrations remove --force --project Kaffebar.Orm
+   ```
+3. Produkteieren vil også ha maks 200 tegn. Legg til `[MaxLength(200)]` på `Comment` (den trenger
+   `using System.ComponentModel.DataAnnotations;`, som `[Timestamp]` i 4A), slik at navnebyttet og
+   lengden kommer i samme migrering:
+   ```bash
+   dotnet ef migrations add Optional4RenameNoteToComment --project Kaffebar.Orm
+   ```
+   Les det `dotnet ef` skriver ut, og les migreringen. Hva skjer nå med dataene i `note`?
+4. Lag `Kaffebar.Orm.Tests/Optional4Tests.cs`. Testen skriver en kommentar på Ada, går tilbake til
+   migreringen før den siste, og fram igjen:
+   ```csharp
+   using Kaffebar.Orm.Data;
+   using Microsoft.EntityFrameworkCore;
+   using Microsoft.EntityFrameworkCore.Infrastructure;
+   using Microsoft.EntityFrameworkCore.Migrations;
+   using Xunit.Abstractions;
+
+   namespace Kaffebar.Orm.Tests;
+
+   /// <summary>Valgfri oppgave 4: en migrering som mister data. Ikke en del av nivåene.</summary>
+   public class Optional4Tests(PostgresFixture fixture, ITestOutputHelper output) : IClassFixture<PostgresFixture>
+   {
+       private const string AdasComment = "Uten lokk, takk";
+
+       [Fact]
+       public async Task Optional4_TheLastMigration_KeepsTheData()
+       {
+           await using var db = fixture.CreateContext(output.WriteLine);
+           var migrations = db.Database.GetMigrations().ToList();
+           var migrator = db.GetService<IMigrator>();
+
+           // Data i kolonnen, slik det ville vært i en database som har vært i bruk en stund.
+           (await db.Orders.SingleAsync(o => o.Id == SeedData.AdaOrderId)).Comment = AdasComment;
+           await db.SaveChangesAsync();
+
+           // Tilbake til migreringen før den siste, og fram igjen.
+           await migrator.MigrateAsync(migrations[^2]);
+           await migrator.MigrateAsync();
+
+           await using var fresh = fixture.CreateContext();
+           var ada = await fresh.Orders.SingleAsync(o => o.Id == SeedData.AdaOrderId);
+           output.Heading($"Ada, før og etter {migrations[^1]}");
+           output.Facts(("Comment før", AdasComment), ("Comment etter", ada.Comment ?? "null"));
+
+           Assert.Equal(AdasComment, ada.Comment);
+       }
+   }
+   ```
+5. Kjør `dotnet test --filter Optional4 --logger "console;verbosity=detailed"`. Se på
+   `── Ada, før og etter …`, og på `ALTER TABLE` i loggen.
+6. Rett migreringen for hånd, slik at dataene blir med begge veier, i både `Up` og `Down`. Kjør testen
+   igjen, og se hva som står under `ALTER TABLE` nå.
+
+> 🤔 **Refleksjon i par:**
+> * EF gjettet riktig i steg 2, men ikke i steg 3. Hva var forskjellen?
+> * Testene for nivåene var grønne hele tiden. Hvorfor merket de ikke at dataene forsvant?
+> * Hvor i et ekte prosjekt bør noen lese migreringen før den kjøres mot produksjon?
 
 ---
 

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
 
 namespace Kaffebar.Orm.Data;
@@ -19,14 +20,16 @@ public static class KaffebarDb
             .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention();
 
-        // Forarbeid: EF sin SQL-logging, som loggeren org.hibernate.SQL i Hibernate. Kun SQL-kommandoene, ikke alt det andre.
+        // Forarbeid: EF sin SQL-logging, som loggeren org.hibernate.SQL i Hibernate. Kun SQL-kommandoene og
+        // advarslene om spørringene, uten tidsstempel og kategori, så det er lett å lese i testresultatet.
         // EnableSensitiveDataLogging viser parameterverdiene i stedet for «?». Aldri i prod.
         if (logSql is not null)
         {
             builder
-                .LogTo(logSql,
-                    [DbLoggerCategory.Database.Command.Name, DbLoggerCategory.Query.Name],
-                    LogLevel.Information)
+                .LogTo(
+                    (id, level) => id == RelationalEventId.CommandExecuted || id == RelationalEventId.CommandError
+                        || (level >= LogLevel.Warning && id.Name?.StartsWith(DbLoggerCategory.Query.Name) == true),
+                    data => logSql(data.LogLevel >= LogLevel.Warning ? $"{data.LogLevel}: {data.EventIdCode}\n{data}" : $"{data}"))
                 .EnableSensitiveDataLogging();
         }
 
