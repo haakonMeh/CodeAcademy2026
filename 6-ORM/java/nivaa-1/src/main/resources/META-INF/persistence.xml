@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence https://jakarta.ee/xml/ns/persistence/persistence_3_2.xsd"
+             version="3.2">
+
+    <persistence-unit name="kaffebar" transaction-type="RESOURCE_LOCAL">
+        <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+
+        <class>no.soprasteria.kaffebar.domene.Brenneri</class>
+        <class>no.soprasteria.kaffebar.domene.Kaffebonne</class>
+        <class>no.soprasteria.kaffebar.domene.Bestilling</class>
+        <class>no.soprasteria.kaffebar.domene.Bestillingslinje</class>
+        <exclude-unlisted-classes>true</exclude-unlisted-classes>
+
+        <properties>
+            <!-- URL, brukernavn og passord settes av Database.java når Postgres-containeren har startet -->
+            <property name="jakarta.persistence.jdbc.driver" value="org.postgresql.Driver"/>
+            <property name="jakarta.persistence.schema-generation.database.action" value="drop-and-create"/>
+
+            <!-- Tilkoblingspool: HikariCP. Liten pool, så det merkes fort om tilkoblinger ikke gis tilbake -->
+            <property name="hibernate.hikari.maximumPoolSize" value="5"/>
+            <property name="hibernate.hikari.minimumIdle" value="1"/>
+            <!-- Advarsel hvis en tilkobling er lånt ut i over 30 sek, f.eks. en transaksjon uten commit/rollback.
+                 NB: også når du står lenge på et breakpoint midt i en transaksjon -->
+            <property name="hibernate.hikari.leakDetectionThreshold" value="30000"/>
+
+            <!-- Teller alle SQL-setninger Hibernate sender til databasen -->
+            <property name="hibernate.session_factory.statement_inspector"
+                      value="no.soprasteria.kaffebar.db.QueryCountLogger"/>
+
+            <!-- SQL-logging slås av og på i logback.xml (loggeren org.hibernate.SQL) -->
+            <property name="hibernate.format_sql" value="false"/>
+        </properties>
+    </persistence-unit>
+</persistence>

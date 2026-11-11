@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <title>Del 1 – Context engineering og AI harness</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/white.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css">
+  <link rel="stylesheet" href="assets/theme.css">
+</head>
+<body>
+<img class="deck-logo" src="assets/logo-color.png" data-color="assets/logo-color.png" data-white="assets/logo-white.png" alt="Sopra Steria">
+<div class="deck-tag">Code Academy 2026 · AI · Del 1</div>
+
+<div class="reveal">
+<div class="slides">
+
+<!-- ============ ÅPNING (≈3 min) ============ -->
+<section class="dark title-slide center no-logo" data-particles
+  data-background-gradient="linear-gradient(135deg,#2a1449 0%,#4d1d82 55%,#8b1d82 100%)">
+  <img src="assets/logo-white.png" alt="Sopra Steria" style="width:220px;margin-bottom:1.2em">
+  <div class="kicker">Code Academy 2026 · Samling 5 · Del 1</div>
+  <h1><span class="grad-text" style="background-image:linear-gradient(90deg,#fff,#f07d00,#fff)">Context engineering</span><br>og AI harness</h1>
+  <p class="sub">Gi Copilot det den trenger for å skrive <em>din</em> kode — hver gang 🧰</p>
+  <aside class="notes">
+    Velkommen. 30 min teori, deretter 60 min workshop i eget repo.
+    Mål for dagen: alle går hjem med første versjon av en harness som faktisk endrer hvordan Copilot oppfører seg.
+  </aside>
+</section>
+
+<section class="dark center" data-background-color="#2a1449">
+  <h2>Rekk opp hånda 🙋</h2>
+  <p class="muted">Har du opplevd at AI-en skrev kode som …</p>
+  <div class="poll">
+    <div class="opt fragment pop"><span class="e">🧩</span>… ikke passet inn i kodebasen?</div>
+    <div class="opt fragment pop"><span class="e">🔁</span>… gjentok samme feil igjen og igjen?</div>
+    <div class="opt fragment pop"><span class="e">📦</span>… ignorerte hjelpeklassene dere har?</div>
+  </div>
+  <p class="fragment blur-in" style="margin-top:1.2em">Da er dette modulen for deg.</p>
+  <aside class="notes">Få folk i gang. La dem rekke opp hånda for hvert punkt. Spør én person om et konkret eksempel.</aside>
+</section>
+
+<section>
+  <h2>Dette skal vi gjennom</h2>
+  <ul class="agenda">
+    <li class="fragment slide-left"><span class="time">5 min</span>🤖 Hva er en agent — og agent-løkken</li>
+    <li class="fragment slide-left"><span class="time">5 min</span>🧰 Hva er en AI harness?</li>
+    <li class="fragment slide-left"><span class="time">8 min</span>📏 Instruksjonsfiler — grunnmuren</li>
+    <li class="fragment slide-left"><span class="time">7 min</span>📦 Skills — kunnskap ved behov</li>
+    <li class="fragment slide-left"><span class="time">3 min</span>✅ Best practices: harnessen er kode</li>
+    <li class="fragment slide-left"><span class="time">60 min</span>🛠️ <strong>Workshop</strong> i ditt eget repo</li>
+  </ul>
+</section>
+
+<section class="center" data-background-color="#fdf2e5">
+  <p class="statement fragment blur-in">En AI-assistent er aldri bedre enn<br><span class="orange">konteksten</span> den får.</p>
+  <aside class="notes">Kjernebudskapet. La det synke inn et par sekunder før du går videre.</aside>
+</section>
+
+<!-- ============ KAPITTEL 1: AGENT (≈5 min) ============ -->
+<section class="dark chapter" data-particles
+  data-background-gradient="linear-gradient(135deg,#4d1d82 0%,#8b1d82 40%,#cf022b 100%)">
+  <div style="position:relative">
+    <div class="num">01</div>
+    <p class="muted">Grunnlag</p>
+    <h2>🤖 Hva er en agent?</h2>
+  </div>
+</section>
+
+<section data-auto-animate>
+  <h2>En språkmodell</h2>
+  <div style="display:flex;align-items:center;justify-content:center;gap:30px;margin-top:2em">
+    <div data-id="in" class="card" style="font-size:.7em">📝 Tekst inn</div>
+    <div data-id="arr1" style="font-size:1.5em;color:#f07d00">→</div>
+    <div data-id="llm" style="background:#4d1d82;color:#fff;border-radius:20px;padding:30px 50px;font:700 1em Tahoma">LLM</div>
+    <div data-id="arr2" style="font-size:1.5em;color:#f07d00">→</div>
+    <div data-id="out" class="card" style="font-size:.7em">💬 Tekst ut</div>
+  </div>
+  <p class="center muted" style="margin-top:2em;font-size:.7em">Smart — men den kan ikke <em>gjøre</em> noe.</p>
+</section>
+
+<section data-auto-animate>
+  <h2>En agent = LLM <span class="orange">i en løkke</span> + verktøy</h2>
+  <div style="display:flex;align-items:center;justify-content:center;gap:40px;margin-top:1.2em">
+    <div data-id="in" class="card" style="font-size:.6em">📝 Oppgave<br>+ kontekst</div>
+    <div data-id="arr1" style="font-size:1.5em;color:#f07d00">→</div>
+    <div style="position:relative">
+      <div data-id="llm" style="background:#f07d00;color:#fff;border-radius:50%;width:190px;height:190px;display:flex;align-items:center;justify-content:center;font:700 .9em Tahoma;box-shadow:0 0 0 14px rgba(240,125,0,.18)">Agent 🔁</div>
+    </div>
+    <div data-id="arr2" style="font-size:1.5em;color:#f07d00">⇄</div>
+    <div data-id="out" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.5em">
+      <span class="pill">📂 les fil</span><span class="pill">✏️ rediger</span>
+      <span class="pill">🧪 kjør test</span><span class="pill">🔎 søk</span>
+      <span class="pill">💻 shell</span><span class="pill">🌐 web</span>
+    </div>
+  </div>
+  <p class="center" style="margin-top:1.4em;font-size:.65em">Copilot agentmodus i VS Code og <code>copilot</code> i terminalen er agenter.</p>
+</section>
+
+<section>
+  <div class="two-col wide-left">
+    <div class="loop-wrap" id="loop">
+      <svg viewBox="0 0 560 560">
+        <defs>
+          <linearGradient id="g1" x1="0" x2="1"><stop offset="0" stop-color="#4d1d82"/><stop offset=".6" stop-color="#cf022b"/><stop offset="1" stop-color="#f07d00"/></linearGradient>
+        </defs>
+        <circle cx="280" cy="280" r="220" fill="none" stroke="url(#g1)" stroke-width="6" class="flow"/>
+        <circle r="12" fill="#f07d00">
+          <animateMotion dur="5s" repeatCount="indefinite" path="M280,60 A220,220 0 1,1 279.9,60"/>
+        </circle>
+      </svg>
+      <div class="loop-center">Agent-<br>løkken</div>
+      <div class="loop-node" id="n1" style="left:280px;top:60px"><span class="e">📥</span>Les oppgave + kontekst</div>
+      <div class="loop-node" id="n2" style="left:489px;top:212px"><span class="e">🧠</span>Tenk: neste steg?</div>
+      <div class="loop-node" id="n3" style="left:409px;top:458px"><span class="e">🛠️</span>Bruk et verktøy</div>
+      <div class="loop-node" id="n4" style="left:151px;top:458px"><span class="e">👀</span>Observer resultatet</div>
+      <div class="loop-node" id="n5" style="left:71px;top:212px"><span class="e">🏁</span>Ferdig? Nei → 2</div>
+    </div>
+    <div style="font-size:.62em">
+      <h2 style="font-size:2em">Agent loop</h2>
+      <p class="fragment" data-activate="#n1">1. Leser oppgaven og konteksten</p>
+      <p class="fragment" data-activate="#n2">2. Tenker ut neste steg</p>
+      <p class="fragment" data-activate="#n3">3. Leser filer, kjører kommandoer, endrer kode</p>
+      <p class="fragment" data-activate="#n4">4. Ser på resultatet — f.eks. en feilmelding</p>
+      <p class="fragment" data-activate="#n5">5. Ikke ferdig? Tilbake til steg 2</p>
+      <p class="fragment callout" style="font-size:1em">Agenten blir så god som det den <strong>ser</strong> underveis.</p>
+    </div>
+  </div>
+  <aside class="notes">Gå gjennom stegene ett og ett. Poenget: hvert steg avhenger av hva som ligger i konteksten.</aside>
+</section>
+
+<section>
+  <h2>Løkken i praksis</h2>
+  <div class="terminal" style="width:92%">
+    <div class="bar"><i></i><i></i><i></i><span>copilot — ~/kaffebar-api</span></div>
+    <pre class="tw"></pre>
+    <script type="text/plain" class="tw-src">
+$ Legg til validering av e-post på bruker-endepunktet
+# 🧠 Jeg må finne hvor brukere opprettes …
++ ✔ Les  src/main/java/no/kaffe/user/UserController.java
++ ✔ Les  src/main/java/no/kaffe/user/UserService.java
+# 🛠️ Legger til @Email på CreateUserRequest …
++ ✔ Rediger  src/main/java/no/kaffe/user/dto/CreateUserRequest.java
+# 🧪 Kjører testene …
++ ✔ Shell  ./mvnw test
+! ✘ UserControllerTest.skal_opprette_bruker FAILED — mangler spring-boot-starter-validation
+# 👀 Observerer feilen. Legger til avhengighet og prøver igjen …
++ ✔ Rediger  pom.xml
++ ✔ Shell  ./mvnw test   →  42 tests, 0 failures
+# 🏁 Ferdig.
+    </script>
+  </div>
+  <p class="hint">Trykk <b>T</b> for å spille av på nytt</p>
+  <aside class="notes">Pek på: les → tenk → verktøy → observer feil → prøv igjen. Det er løkken.</aside>
+</section>
+
+<section>
+  <h2>Kontekstvinduet er alt agenten vet</h2>
+  <div class="ctx" id="ctx1">
+    <div class="seg fragment" style="--w:12%;background:#2a1449">System</div>
+    <div class="seg fragment" style="--w:10%;background:#4d1d82">Oppgaven</div>
+    <div class="seg fragment" style="--w:30%;background:#8b1d82">Filer den har lest</div>
+    <div class="seg fragment" style="--w:28%;background:#cf022b">Verktøyresultater</div>
+  </div>
+  <div class="ctx-legend"><span>0 tokens</span><span>grense ➜</span></div>
+  <div class="fragment blur-in" style="margin-top:1.4em">
+    <p class="statement" style="font-size:1.1em">Alt annet må den <span class="red">gjette</span>. 🎲</p>
+    <p style="font-size:.7em">Når den gjetter, skriver den <strong>generisk</strong> kode i stedet for <strong>din</strong> kode.</p>
+  </div>
+  <aside class="notes">Kontekstvinduet fylles opp. Modellen vet ingenting om prosjektet utover dette — ikke teamets konvensjoner, ikke hjelpeklassene, ikke hva som er forbudt.</aside>
+</section>
+
+<section>
+  <h2>Generisk kode vs. <span class="orange">din</span> kode</h2>
+  <div class="two-col" style="align-items:start">
+    <div>
+      <p class="file-label">😐 Uten kontekst</p>
+      <pre><code class="language-typescript" data-trim>
+const res = await fetch('/api/users?active=true');
+if (!res.ok) {
+  throw new Error('Noe gikk galt');
+}
+const users = await res.json();
+console.log('hentet brukere', users);
+      </code></pre>
+    </div>
+    <div class="fragment slide-left">
+      <p class="file-label">😍 Med harness</p>
+      <pre><code class="language-typescript" data-trim>
+const result = await apiClient.get(
+  Endpoints.ACTIVE_USERS,
+  UserListSchema,
+);
+if (result.isErr()) return logger.warn(result.error);
+return result.value;
+      </code></pre>
+    </div>
+  </div>
+  <p class="fragment" style="font-size:.6em">Begge «virker». Bare én av dem kommer gjennom review uten kommentarer.</p>
+</section>
+
+<!-- ============ KAPITTEL 2: HARNESS (≈5 min) ============ -->
+<section class="dark chapter" data-particles
+  data-background-gradient="linear-gradient(135deg,#4d1d82 0%,#8b1d82 40%,#cf022b 100%)">
+  <div style="position:relative">
+    <div class="num">02</div>
+    <p class="muted">Konseptet</p>
+    <h2>🧰 Hva er en AI harness?</h2>
+  </div>
+</section>
+
+<section class="center">
+  <div class="equation">
+    <span class="term" style="background:#4d1d82;color:#fff">🧰 Harness</span>
+    <span class="op fragment pop" style="color:#f07d00">=</span>
+    <span class="term fragment pop">🧠 modell</span>
+    <span class="op fragment pop">+</span>
+    <span class="term hl fragment pop">📚 kontekst</span>
+    <span class="op fragment pop">+</span>
+    <span class="term hl fragment pop">🛠️ verktøy</span>
+    <span class="op fragment pop">+</span>
+    <span class="term hl fragment pop">📏 regler</span>
+  </div>
+  <div class="fragment blur-in" style="margin-top:1.4em;font-size:.75em">
+    <p>Modellen <span class="purple">velger</span> du. Resten <span class="orange">bygger</span> du — og det bør ligge <strong>i repoet</strong>.</p>
+  </div>
+  <p class="fragment" style="font-size:.6em;margin-top:1em"><strong>Context engineering</strong> = bestemme <em>hva</em> modellen ser, <em>når</em> den ser det, og <em>hvor mye</em>.</p>
+</section>
+
+<section>
+  <h2>Byggeklossene</h2>
+  <div class="blocks">
+    <div class="block fragment drop" style="background:#4d1d82"><span>📏 <b>Instruksjoner</b> — gjelder alltid</span><code>AGENTS.md · copilot-instructions.md</code></div>
+    <div class="block fragment drop" style="background:#8b1d82"><span>🗂️ <b>Stibaserte instruksjoner</b> — deler av koden</span><code>.github/instructions/*.instructions.md</code></div>
+    <div class="block fragment drop" style="background:#cf022b"><span>📦 <b>Skills</b> — lastes ved behov</span><code>.github/skills/&lt;navn&gt;/SKILL.md</code></div>
+    <div class="block fragment drop" style="background:#a8a8a7"><span>🕵️ <b>Custom agents</b> <span class="tag">· del 2</span></span><code>.github/agents/*.agent.md</code></div>
+    <div class="block fragment drop" style="background:#a8a8a7"><span>🛡️ <b>Hooks</b> <span class="tag">· del 2</span></span><code>.github/hooks/*.json</code></div>
+  </div>
+  <aside class="notes">Vi bygger nedenfra. I dag: de tre fargede. Agents og hooks kommer i del 2.</aside>
+</section>
+
+<section>
+  <h2>🎯 Ansvaret ligger hos <span class="orange">deg</span></h2>
+  <p style="font-size:.65em">Hos de fleste kunder er ingenting lagt til rette for AI på forhånd. Det gode? En harness er <strong>bare tekstfiler</strong>.</p>
+  <div class="cards c3">
+    <div class="card fragment pop"><span class="icon">🏗️</span><h3>Ingen infrastruktur</h3>Du trenger ingenting fra kunden.</div>
+    <div class="card orange fragment pop"><span class="icon">🔍</span><h3>Review &amp; versjonering</h3>Som all annen kode.</div>
+    <div class="card warm fragment pop"><span class="icon">👥</span><h3>Hele teamet</h3>Får nytte så snart det er merget.</div>
+  </div>
+  <div class="callout warn fragment">⚠️ Avklar med prosjektet og kunden før du committer AI-filer til kundens repo.</div>
+</section>
+
+<!-- ============ KAPITTEL 3: INSTRUKSJONER (≈8 min) ============ -->
+<section class="dark chapter" data-particles
+  data-background-gradient="linear-gradient(135deg,#4d1d82 0%,#8b1d82 40%,#cf022b 100%)">
+  <div style="position:relative">
+    <div class="num">03</div>
+    <p class="muted">Grunnmuren</p>
+    <h2>📏 Instruksjonsfiler</h2>
+  </div>
+</section>
+
+<section>
+  <h2>Leses automatisk i <span class="orange">hver</span> økt</h2>
+  <table>
+    <tr><th>Fil</th><th>Hvor</th><th>Merknad</th></tr>
+    <tr class="fragment"><td><code>.github/copilot-instructions.md</code></td><td>Rot</td><td>Alle Copilot-flater. Ingen frontmatter.</td></tr>
+    <tr class="fragment"><td><code>AGENTS.md</code></td><td>Rot / undermapper</td><td>Åpen standard. Nærmeste fil i mappetreet gjelder.</td></tr>
+    <tr class="fragment"><td><code>CLAUDE.md</code></td><td>Rot</td><td>Støttes — men velg <b>ett</b> format for teamet.</td></tr>
+  </table>
+  <div class="terminal fragment" style="width:80%;margin-top:1em">
+    <div class="bar"><i></i><i></i><i></i><span>copilot</span></div>
+    <pre class="tw" style="min-height:4.5em"></pre>
+    <script type="text/plain" class="tw-src">
+$ /init
+# Analyserer repoet … byggverktøy, mappestruktur, testoppsett
++ ✔ Opprettet .github/copilot-instructions.md  (utkast — les kritisk!)
+    </script>
+  </div>
+</section>
+
+<section>
+  <h2>Hører det hjemme i instruksjonsfilen? 🤔</h2>
+  <div class="quiz">
+    <div class="q yes">«Kjør tester med <code>./mvnw test</code>»<span class="a green">✅ Ja — eksakte kommandoer</span></div>
+    <div class="q no">«Skriv ren og lesbar kode»<span class="a red">❌ Nei — generelt råd</span></div>
+    <div class="q yes">«Bruk vår <code>ApiClient</code>, ikke <code>fetch</code> direkte»<span class="a green">✅ Ja — ting modellen tar feil av</span></div>
+    <div class="q no">«Prosjektet startet i 2019 da vi byttet fra …»<span class="a red">❌ Nei — historikk</span></div>
+    <div class="q yes">«Aldri endre migreringer som er kjørt»<span class="a green">✅ Ja — det som er forbudt</span></div>
+    <div class="q no">«Vi bruker Spring Boot 3»<span class="a red">❌ Nei — ser den selv i <code>pom.xml</code></span></div>
+    <div class="q yes">«Feil returneres som <code>Result&lt;T&gt;</code>, ikke exceptions»<span class="a green">✅ Ja — ikke-åpenbar konvensjon</span></div>
+    <div class="q no">«DB-passord: <code>hunter2</code>»<span class="a red">❌ Aldri — hemmeligheter!</span></div>
+  </div>
+  <p class="hint">👆 Klikk på et kort for å avsløre svaret — spør salen først!</p>
+  <aside class="notes">Interaktivt: les opp et kort, la salen stemme med tommel opp/ned, klikk for å avsløre.</aside>
+</section>
+
+<section data-auto-animate>
+  <h2>Skriv regler som <span class="orange">konkrete instruksjoner</span></h2>
+  <div data-id="rule" class="card red" style="font-size:.8em">😶 «Vi liker funksjonell feilhåndtering.»</div>
+</section>
+<section data-auto-animate>
+  <h2>Skriv regler som <span class="orange">konkrete instruksjoner</span></h2>
+  <div data-id="rule" class="card green" style="font-size:.8em">💪 «Bruk <code>Result&lt;T&gt;</code> for feil, ikke exceptions.»</div>
+  <div class="fragment blur-in" style="margin-top:1.4em">
+    <p class="statement" style="font-size:1em">📏 Hold filen <span class="orange">kort</span> (&lt; ~60 linjer)</p>
+    <p style="font-size:.65em">Hver linje koster plass i kontekstvinduet i <em>hver</em> økt.<br>Kan du ikke forklare hvorfor en linje er der? <strong>Fjern den.</strong></p>
+  </div>
+</section>
+
+<section>
+  <h2>🗂️ Stibaserte instruksjoner</h2>
+  <div class="two-col" style="align-items:start">
+    <div>
+      <p class="file-label">.github/instructions/tester.instructions.md</p>
+      <pre><code class="language-markdown" data-trim data-line-numbers="1-3|2|4-6">
+---
+applyTo: 'src/test/**/*.java'
+---
+- Bruk JUnit 5 og AssertJ, ikke Hamcrest.
+- Testnavn: `skal_<forventet>_når_<betingelse>`.
+- Bruk `TestDataBuilder` i `src/test/support`.
+      </code></pre>
+    </div>
+    <div style="font-size:.6em">
+      <p><b>Agenten jobber med …</b></p>
+      <div class="card green fragment slide-left" style="font-size:1em">📄 <code>src/test/…/UserTest.java</code><br>→ testreglene <b class="green">lastes</b> ✅</div>
+      <div class="card fragment slide-left" style="font-size:1em;margin-top:14px;border-top-color:#a8a8a7">⚛️ <code>web/src/App.tsx</code><br>→ testreglene <b class="muted">lastes ikke</b> 💤</div>
+      <p class="fragment" style="margin-top:1em">Riktige regler, til riktig tid — uten å bruke kontekst på resten.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ KAPITTEL 4: SKILLS (≈7 min) ============ -->
+<section class="dark chapter" data-particles
+  data-background-gradient="linear-gradient(135deg,#4d1d82 0%,#8b1d82 40%,#cf022b 100%)">
+  <div style="position:relative">
+    <div class="num">04</div>
+    <p class="muted">Kunnskap ved behov</p>
+    <h2>📦 Skills</h2>
+  </div>
+</section>
+
+<section>
+  <h2>Progressiv lasting ⚡</h2>
+  <p style="font-size:.6em">En skill er en mappe med <code>SKILL.md</code> — og eventuelt maler, skript og eksempler.</p>
+  <div class="layers">
+    <div class="layer fragment slide-left"><div class="lvl">1</div><div class="box"><b>Ved oppstart:</b> agenten ser bare <b>navn + beskrivelse</b> for alle skills</div><div class="cost" title="kontekst"><span style="--w:8%"></span></div></div>
+    <div class="layer fragment slide-left"><div class="lvl">2</div><div class="box"><b>Når oppgaven passer:</b> innholdet i <code>SKILL.md</code> lastes</div><div class="cost"><span style="--w:40%"></span></div></div>
+    <div class="layer fragment slide-left"><div class="lvl">3</div><div class="box"><b>Bare ved behov:</b> andre filer i mappen, hvis skillen viser til dem</div><div class="cost"><span style="--w:85%"></span></div></div>
+  </div>
+  <p class="fragment blur-in center" style="margin-top:1em;font-size:.75em">➜ Mange skills, <strong>uten</strong> å fylle opp kontekstvinduet.</p>
+  <aside class="notes">Stolpene til høyre viser hvor mye kontekst hvert nivå koster. Nivå 1 er nesten gratis.</aside>
+</section>
+
+<section>
+  <h2>Anatomien til en skill</h2>
+  <div class="two-col" style="grid-template-columns:.7fr 1.3fr;align-items:start">
+    <pre><code class="language-plaintext" data-trim>
+.github/skills/
+└── nytt-endepunkt/
+    ├── SKILL.md
+    ├── mal-controller.java
+    └── sjekkliste.md
+    </code></pre>
+    <pre><code class="language-markdown" data-trim data-line-numbers="1-4|3|7|8|9-11|12">
+---
+name: nytt-endepunkt
+description: Lager et nytt REST-endepunkt etter teamets mønster (controller, service, DTO og tester). Bruk når brukeren ber om et nytt API-endepunkt.
+---
+# Nytt REST-endepunkt
+
+1. Les `mal-controller.java` og følg strukturen.
+2. Lag DTO-er i `api/dto`, aldri eksponer entiteter direkte.
+3. Legg forretningslogikk i en service, ikke i controlleren.
+4. Skriv en controller-test og en service-test.
+5. Kjør `./mvnw test` og fiks feil før du sier at du er ferdig.
+6. Gå gjennom `sjekkliste.md` til slutt.
+    </code></pre>
+  </div>
+  <div class="callout fragment" style="font-size:.55em">🔑 <b><code>description</code> er det viktigste feltet</b> — skriv både <em>hva</em> skillen gjør og <em>når</em> den skal brukes.</div>
+  <aside class="notes">Steg gjennom linjene: description (når!), referanse til mal (lastes ved behov), verifisering til slutt.</aside>
+</section>
+
+<section>
+  <h2>Skills som <span class="orange">workflows</span></h2>
+  <div class="wf-row" style="display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:nowrap;margin-top:1em">
+    <div class="card fragment pop" style="text-align:center">🔍<br><b>Forstå</b></div><span class="fragment pop orange">→</span>
+    <div class="card fragment pop" style="text-align:center">🗺️<br><b>Planlegg</b><br><small>✋ godkjenning</small></div><span class="fragment pop orange">→</span>
+    <div class="card red fragment pop" style="text-align:center">🧪<br><b>Test først</b></div><span class="fragment pop orange">→</span>
+    <div class="card orange fragment pop" style="text-align:center">⌨️<br><b>Implementer</b></div><span class="fragment pop orange">→</span>
+    <div class="card green fragment pop" style="text-align:center">✅<br><b>Verifiser</b></div><span class="fragment pop orange">→</span>
+    <div class="card warm fragment pop" style="text-align:center">📝<br><b>Oppsummer</b></div>
+  </div>
+  <div class="callout fragment" style="margin-top:1.2em">💡 <b>Prompt-filer</b> (<code>.prompt.md</code>) er på vei ut og støttes ikke i Copilot CLI. Bruk skills — de virker både i VS Code og CLI.</div>
+</section>
+
+<section>
+  <h2>Når bruker du hva?</h2>
+  <div class="decide">
+    <div class="row fragment slide-left"><div class="qq">Gjelder det <b>alltid</b>?</div><div class="arrow">➜</div><div class="ans">📏 Instruksjonsfil</div></div>
+    <div class="row fragment slide-left"><div class="qq">Gjelder det bestemte <b>filer</b>?</div><div class="arrow">➜</div><div class="ans">🗂️ Stibasert instruksjon</div></div>
+    <div class="row fragment slide-left"><div class="qq">Gjelder det en <b>type oppgave</b>?</div><div class="arrow">➜</div><div class="ans">📦 Skill</div></div>
+    <div class="row fragment slide-left"><div class="qq">Trengs egen <b>rolle</b>, egne verktøy eller annen modell?</div><div class="arrow">➜</div><div class="ans later">🕵️ Custom agent · del 2</div></div>
+  </div>
+</section>
+
+<!-- ============ KAPITTEL 5: BEST PRACTICES (≈3 min) ============ -->
+<section data-background-color="#ede9f2">
+  <h2>✅ Harnessen er <span class="orange">kode</span></h2>
+  <div class="cards c4" style="gap:14px">
+    <div class="card fragment pop"><span class="icon">🔀</span><h3>Versjoner</h3>Gjennom merge request og review.</div>
+    <div class="card orange fragment pop"><span class="icon">🌱</span><h3>Start lite</h3>Én kort instruksjonsfil + én skill.</div>
+    <div class="card red fragment pop"><span class="icon">🐞</span><h3>Feil = mulighet</h3>Samme feil to ganger? Ny regel.</div>
+    <div class="card warm fragment pop"><span class="icon">🧪</span><h3>Test den</h3>Samme oppgave før og etter.</div>
+    <div class="card green fragment pop"><span class="icon">🔁</span><h3>Selvsjekk</h3>Tester, lint og bygg er beste kontekst.</div>
+    <div class="card fragment pop"><span class="icon">🧹</span><h3>Rydd</h3>Utdaterte regler forgifter konteksten.</div>
+    <div class="card orange fragment pop"><span class="icon">🆕</span><h3>Ny økt ofte</h3>Gammel kontekst gir dårligere svar.</div>
+    <div class="card fragment pop" style="background:#4d1d82;color:#fff;border-top-color:#f07d00"><span class="icon">🎯</span><h3 style="color:#fff">Målet</h3>AI-kode som består review første gang.</div>
+  </div>
+</section>
+
+<section>
+  <h2>🎓 Oppsummering</h2>
+  <ul style="font-size:.75em">
+    <li class="fragment">🤖 En <strong>agent</strong> er en modell som bruker verktøy i en løkke — den vet bare det som er i konteksten.</li>
+    <li class="fragment">🧰 En <strong>harness</strong> er instruksjoner, skills, agenter og regler i repoet.</li>
+    <li class="fragment">📏 <strong>Instruksjonsfiler</strong> er korte og inneholder det som <em>alltid</em> gjelder.</li>
+    <li class="fragment">📦 <strong>Skills</strong> lastes ved behov — for oppgavetyper og workflows.</li>
+    <li class="fragment">🔁 Harnessen <strong>versjoneres, testes og forbedres</strong> som annen kode.</li>
+  </ul>
+</section>
+
+<!-- ============ WORKSHOP-INTRO ============ -->
+<section class="dark center" data-particles
+  data-background-gradient="linear-gradient(135deg,#2a1449 0%,#4d1d82 50%,#f07d00 140%)">
+  <div class="big-emoji float">🛠️</div>
+  <h2>Workshop 1</h2>
+  <p class="statement" style="font-size:1.1em">Bygg første versjon av harnessen din</p>
+  <p class="muted" style="font-size:.6em">I ditt eget repo · <code>5-AI/oppgaver-harness.md</code></p>
+</section>
+
+<section>
+  <h2>To spor — velg ditt</h2>
+  <div class="cards c2">
+    <div class="card green fragment pop"><h3><span class="track g">🟢 Grunnspor</span> Oppgave 1–4</h3>Ny med AI-assistenter, eller ikke laget instruksjoner og skills før.</div>
+    <div class="card blue fragment pop"><h3><span class="track b">🔵 Ekspertspor</span> Oppgave 5–7</h3>Tatt AI-Akademiet eller komfortabel med Copilot. Gjør 1–3 raskt først.</div>
+  </div>
+  <div class="timeline fragment">
+    <div class="t g" style="flex:10"><b>1 · Mål utgangspunktet</b>Prompt ordrett, uten harness · 10 min</div>
+    <div class="t g" style="flex:15"><b>2 · Instruksjonsfil</b>/init, stryk, legg til · 15 min</div>
+    <div class="t g" style="flex:5"><b>3 · Test</b>Ny økt · 5 min</div>
+    <div class="t p" style="flex:8"><b>☕ Pause</b>5–10 min</div>
+    <div class="t g" style="flex:15"><b>4 · Første skill</b>Finner agenten den selv? · 15 min</div>
+  </div>
+  <div class="timeline fragment" style="margin-top:8px">
+    <div class="t b" style="flex:1;min-height:70px"><b>5 · Stibaserte instruksjoner</b></div>
+    <div class="t b" style="flex:1;min-height:70px"><b>6 · Workflow-skill</b></div>
+    <div class="t b" style="flex:1;min-height:70px"><b>7 · Stresstest harnessen</b></div>
+  </div>
+</section>
+
+<section>
+  <h2>Før du starter 🚦</h2>
+  <div class="terminal" style="width:85%">
+    <div class="bar"><i></i><i></i><i></i><span>terminal — ditt repo</span></div>
+    <pre class="tw" style="min-height:6em"></pre>
+    <script type="text/plain" class="tw-src">
+$ git checkout -b feature/ai-harness
++ Switched to a new branch 'feature/ai-harness'
+$ copilot
+# Klar! Commit ofte — da kan du alltid gå tilbake.
+    </script>
+  </div>
+  <div class="cards c3" style="margin-top:1em">
+    <div class="card fragment pop"><span class="icon">🤖</span>Står du fast? <b>Spør AI-en først</b> — bruk hjelpeprompten i <code>AI-Helper.md</code>.</div>
+    <div class="card orange fragment pop"><span class="icon">🙋</span>Fortsatt fast? Spør sidemannen eller kursholder.</div>
+    <div class="card green fragment pop"><span class="icon">🏁</span>Mål: en harness som <b>virker</b> — ikke å rekke alt.</div>
+  </div>
+</section>
+
+<section class="dark center" data-background-color="#2a1449">
+  <h2>⏱️ Workshop pågår</h2>
+  <div class="timer" data-minutes="60">
+    <div class="timer-big">60:00</div>
+    <div class="timer-progress"><span></span></div>
+    <div class="timer-controls"><button data-act="start">▶ Start / pause</button><button class="sec" data-act="reset">↺ Nullstill</button></div>
+  </div>
+  <p class="muted" style="font-size:.5em;margin-top:1.5em">🏁 Før du går: kort instruksjonsfil · minst én skill agenten finner · alt committet på <code>feature/ai-harness</code></p>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/zoom/zoom.js"></script>
+<script src="assets/effects.js"></script>
+</body>
+</html>

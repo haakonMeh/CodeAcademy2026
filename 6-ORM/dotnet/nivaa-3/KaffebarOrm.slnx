@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Kaffebar.Orm.Tests/Kaffebar.Orm.Tests.csproj" />
+  <Project Path="Kaffebar.Orm/Kaffebar.Orm.csproj" />
+</Solution>

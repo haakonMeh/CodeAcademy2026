@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <title>Samling 5 – AI · Presentasjoner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="assets/theme.css">
+  <style>
+    body { margin: 0; min-height: 100vh; font-family: var(--font-body); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #2a1449 0%, #4d1d82 55%, #8b1d82 100%); }
+    body::after { content: ''; position: fixed; left: 0; right: 0; bottom: 0; height: 8px; background: var(--ss-gradient); }
+    h1 { font: 700 3rem var(--font-heading); margin: .2em 0 1em; text-align: center; }
+    .kicker { font: 700 .9rem var(--font-body); letter-spacing: .25em; text-transform: uppercase; color: var(--ss-orange); }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(280px, 420px)); gap: 28px; padding: 0 24px; }
+    a.deck { display: block; text-decoration: none; color: #fff; background: rgba(255, 255, 255, .08); border: 2px solid rgba(255, 255, 255, .15);
+      border-radius: 20px; padding: 28px; transition: transform .3s, border-color .3s, background .3s; }
+    a.deck:hover { transform: translateY(-6px); border-color: var(--ss-orange); background: rgba(255, 255, 255, .14); }
+    a.deck .n { font: 700 3rem var(--font-heading); color: var(--ss-orange); line-height: 1; }
+    a.deck h2 { font: 700 1.5rem var(--font-heading); margin: .4em 0; }
+    a.deck p { opacity: .8; margin: 0; line-height: 1.4; }
+    .tips { margin-top: 2.5em; opacity: .7; font-size: .9rem; text-align: center; line-height: 1.7; }
+    kbd { background: rgba(255, 255, 255, .15); border-radius: 5px; padding: 1px 7px; font-family: var(--font-mono); }
+    img { width: 200px; margin-bottom: 1.5em; }
+    @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <img src="assets/logo-white.png" alt="Sopra Steria">
+  <div class="kicker">Code Academy 2026 · Samling 5</div>
+  <h1>AI: harness og orkestrering</h1>
+  <div class="grid">
+    <a class="deck" href="del1-harness.html">
+      <div class="n">01</div>
+      <h2>🧰 Context engineering og AI harness</h2>
+      <p>Agent-løkken, instruksjonsfiler og skills. 30 min → Workshop 1.</p>
+    </a>
+    <a class="deck" href="del2-orkestrering.html">
+      <div class="n">02</div>
+      <h2>🕸️ Subagenter, orkestrering og guardrails</h2>
+      <p>Custom agents, patterns, modellvalg og hooks. 30 min → Workshop 2.</p>
+    </a>
+  </div>
+  <div class="tips">
+    <kbd>S</kbd> talernotater · <kbd>F</kbd> fullskjerm · <kbd>O</kbd>/<kbd>Esc</kbd> oversikt · <kbd>T</kbd> spill av terminal på nytt · <kbd>Alt</kbd>+klikk zoom
+  </div>
+</body>
+</html>

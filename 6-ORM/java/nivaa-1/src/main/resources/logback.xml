@@ -1,0 +1,48 @@
+<configuration>
+
+    <!-- java.util.logging (Jersey, Grizzly) sendes videre hit via jul-to-slf4j, se KaffebarApp.
+         LevelChangePropagator gjør at JUL bare lager logglinjer som faktisk skal skrives ut. -->
+    <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
+        <resetJUL>true</resetJUL>
+    </contextListener>
+
+    <appender name="KONSOLL" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{30} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ============================================================================================
+         Hibernate: skru av og på her
+         ============================================================================================ -->
+
+    <!-- SQL-setningene Hibernate sender til databasen. DEBUG = på, INFO = av -->
+    <logger name="org.hibernate.SQL" level="INFO"/>
+
+    <!-- Parameterverdiene, altså det som står på plassen til ? i SQL-en. TRACE = på, INFO = av.
+         Gir mye utskrift: testdataene skrives også ut ved oppstart. -->
+    <logger name="org.hibernate.orm.jdbc.bind" level="INFO"/>
+
+    <!-- Verdiene Hibernate leser ut av resultatsettene. TRACE = på, INFO = av. Enda mer utskrift. -->
+    <logger name="org.hibernate.orm.jdbc.extract" level="INFO"/>
+
+    <!-- Statistikk per session (antall spørringer, tid brukt …). DEBUG = på, INFO = av.
+         Krever også <property name="hibernate.generate_statistics" value="true"/> i persistence.xml -->
+    <logger name="org.hibernate.stat" level="INFO"/>
+
+    <!-- Resten av Hibernate -->
+    <logger name="org.hibernate" level="WARN"/>
+
+    <!-- ============================================================================================
+         Andre biblioteker
+         ============================================================================================ -->
+    <logger name="com.zaxxer.hikari" level="INFO"/>
+    <logger name="org.glassfish" level="WARN"/>
+    <logger name="org.testcontainers" level="WARN"/>
+    <logger name="tc" level="WARN"/>
+    <logger name="com.github.dockerjava" level="WARN"/>
+
+    <root level="INFO">
+        <appender-ref ref="KONSOLL"/>
+    </root>
+</configuration>

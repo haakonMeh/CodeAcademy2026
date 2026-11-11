@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <title>Del 2 – Subagenter, orkestrering og guardrails</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/white.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css">
+  <link rel="stylesheet" href="assets/theme.css">
+</head>
+<body>
+<img class="deck-logo" src="assets/logo-color.png" data-color="assets/logo-color.png" data-white="assets/logo-white.png" alt="Sopra Steria">
+<div class="deck-tag">Code Academy 2026 · AI · Del 2</div>
+
+<div class="reveal">
+<div class="slides">
+
+<!-- ============ ÅPNING (≈3 min) ============ -->
+<section class="dark title-slide center no-logo" data-particles
+  data-background-gradient="linear-gradient(135deg,#2a1449 0%,#4d1d82 55%,#cf022b 130%)">
+  <img src="assets/logo-white.png" alt="Sopra Steria" style="width:220px;margin-bottom:1.2em">
+  <div class="kicker">Code Academy 2026 · Samling 5 · Del 2</div>
+  <h1>Subagenter, <span class="grad-text" style="background-image:linear-gradient(90deg,#fff,#f07d00,#fff)">orkestrering</span><br>og guardrails</h1>
+  <p class="sub">Fra én assistent til et lite agentteam — med trygge rammer 🕸️🛡️</p>
+  <aside class="notes">30 min teori, så 60 min workshop. Vi bygger videre på branchen feature/ai-harness fra del 1.</aside>
+</section>
+
+<section class="dark center" data-background-color="#2a1449">
+  <h2>Hvordan gikk det? 🙋</h2>
+  <div class="poll">
+    <div class="opt fragment pop"><span class="e">📏</span>Instruksjonsfilen gjorde en forskjell</div>
+    <div class="opt fragment pop"><span class="e">📦</span>Agenten fant skillen <em>selv</em></div>
+    <div class="opt fragment pop"><span class="e">🤯</span>Konteksten ble full i løpet av økta</div>
+  </div>
+  <p class="fragment blur-in" style="margin-top:1.2em">Den siste? Den løser vi i dag.</p>
+  <aside class="notes">Rask runde. Spør én som fikk skillen til å trigge automatisk hva de skrev i description.</aside>
+</section>
+
+<section>
+  <h2>Dette skal vi gjennom</h2>
+  <ul class="agenda">
+    <li class="fragment slide-left"><span class="time">7 min</span>🤝 Hvorfor subagenter — og custom agents</li>
+    <li class="fragment slide-left"><span class="time">9 min</span>🗺️ Orchestration patterns</li>
+    <li class="fragment slide-left"><span class="time">5 min</span>🧠 Riktig modell til riktig oppgave</li>
+    <li class="fragment slide-left"><span class="time">7 min</span>🛡️ Guardrails og tilganger</li>
+    <li class="fragment slide-left"><span class="time">60 min</span>🛠️ <strong>Workshop</strong>: bygg et agentteam</li>
+  </ul>
+</section>
+
+<!-- ============ KAPITTEL 1: SUBAGENTER (≈7 min) ============ -->
+<section class="dark chapter" data-particles
+  data-background-gradient="linear-gradient(135deg,#4d1d82 0%,#8b1d82 40%,#cf022b 100%)">
+  <div style="position:relative">
+    <div class="num">01</div>
+    <p class="muted">Del opp arbeidet</p>
+    <h2>🤝 Hvorfor subagenter?</h2>
+  </div>
+</section>
+
+<section>
+  <h2>Én agent som gjør <span class="red">alt</span> …</h2>
+  <div class="ctx" id="ctxOver">
+    <div class="seg fragment" style="--w:8%;background:#2a1449">Sys</div>
+    <div class="seg fragment" style="--w:14%;background:#4d1d82">40 filer lest</div>
+    <div class="seg fragment" style="--w:18%;background:#8b1d82">Testlogger</div>
+    <div class="seg fragment" style="--w:16%;background:#cf022b">Mislykkede forsøk</div>
+    <div class="seg fragment" style="--w:20%;background:#f07d00">Enda flere filer</div>
+    <div class="seg fragment" style="--w:24%;background:#cf022b" data-addclass="#ctxOver|overflow">💥 FULLT</div>
+  </div>
+  <div class="ctx-legend"><span>start på økta</span><span>grense ➜</span></div>
+  <div class="cards c3" style="margin-top:1.2em">
+    <div class="card red fragment pop"><span class="icon">🐢</span><h3>Tregere</h3>Mer å lese for hvert steg.</div>
+    <div class="card red fragment pop"><span class="icon">💸</span><h3>Dyrere</h3>Flere tokens per kall.</div>
+    <div class="card red fragment pop"><span class="icon">🥴</span><h3>Dårligere</h3>Viktig info drukner i støy.</div>
+  </div>
+</section>
+
+<section>
+  <h2>Subagent = avgrenset oppgave + <span class="orange">rent kontekstvindu</span></h2>
+  <div class="tree">
+    <svg viewBox="0 0 1000 380">
+      <rect x="380" y="10" width="240" height="70" rx="16" fill="#4d1d82"/>
+      <text x="500" y="45" class="svgtxt" style="font-size:20px">🎼 Hovedagent</text>
+
+      <g class="fragment" data-fragment-index="1">
+        <path class="draw" d="M450 80 C 450 150, 160 140, 160 220" stroke="#f07d00" stroke-width="4" fill="none"/>
+        <rect x="60" y="220" width="200" height="64" rx="14" fill="#8b1d82"/>
+        <text x="160" y="252" class="svgtxt" style="font-size:18px">🔎 Utforsker</text>
+        <rect x="60" y="296" width="200" height="12" rx="6" fill="#ede9f2"/><rect x="60" y="296" width="180" height="12" rx="6" fill="#cf022b"/>
+        <text x="160" y="330" class="svgtxt dark" style="font-size:14px">leser 40 filer</text>
+      </g>
+      <g class="fragment" data-fragment-index="2">
+        <path class="draw" d="M500 80 L 500 220" stroke="#f07d00" stroke-width="4" fill="none"/>
+        <rect x="400" y="220" width="200" height="64" rx="14" fill="#8b1d82"/>
+        <text x="500" y="252" class="svgtxt" style="font-size:18px">⌨️ Implementer</text>
+        <rect x="400" y="296" width="200" height="12" rx="6" fill="#ede9f2"/><rect x="400" y="296" width="120" height="12" rx="6" fill="#f07d00"/>
+        <text x="500" y="330" class="svgtxt dark" style="font-size:14px">skriver koden</text>
+      </g>
+      <g class="fragment" data-fragment-index="3">
+        <path class="draw" d="M550 80 C 550 150, 840 140, 840 220" stroke="#f07d00" stroke-width="4" fill="none"/>
+        <rect x="740" y="220" width="200" height="64" rx="14" fill="#8b1d82"/>
+        <text x="840" y="252" class="svgtxt" style="font-size:18px">🔍 Reviewer</text>
+        <rect x="740" y="296" width="200" height="12" rx="6" fill="#ede9f2"/><rect x="740" y="296" width="90" height="12" rx="6" fill="#4d1d82"/>
+        <text x="840" y="330" class="svgtxt dark" style="font-size:14px">leser diff</text>
+      </g>
+      <g class="fragment" data-fragment-index="4">
+        <path d="M160 220 C 160 160, 420 160, 430 82" stroke="#2e9e5b" stroke-width="3" fill="none" class="flow"/>
+        <path d="M840 220 C 840 160, 580 160, 570 82" stroke="#2e9e5b" stroke-width="3" fill="none" class="flow"/>
+        <text x="230" y="112" class="svgtxt" style="fill:#2e9e5b;font-size:16px">📄 10 linjer sammendrag</text>
+        <text x="780" y="112" class="svgtxt" style="fill:#2e9e5b;font-size:16px">📄 prioriterte funn</text>
+        <rect x="380" y="92" width="240" height="10" rx="5" fill="#ede9f2"/><rect x="380" y="92" width="50" height="10" rx="5" fill="#2e9e5b"/>
+      </g>
+    </svg>
+  </div>
+  <p class="fragment center" data-fragment-index="5" style="font-size:.65em">Hovedagenten får bare <strong>sammendraget</strong> — og holder seg ryddig 🧹</p>
+  <aside class="notes">Fargestolpene under hver agent er kontekstbruken deres. Hovedagenten (grønn stolpe øverst) forblir nesten tom.</aside>
+</section>
+
+<section>
+  <h2>Hva du vinner</h2>
+  <div class="cards c4">
+    <div class="card fragment pop"><span class="icon">🧼</span><h3>Kontekst&shy;isolasjon</h3>Hovedagenten holder seg ryddig.</div>
+    <div class="card orange fragment pop"><span class="icon">🎯</span><h3>Spesialisering</h3>Egne instruksjoner, verktøy og modell.</div>
+    <div class="card warm fragment pop"><span class="icon">⚡</span><h3>Parallellitet</h3>Uavhengige oppgaver samtidig.</div>
+    <div class="card red fragment pop"><span class="icon">🔐</span><h3>Minste privilegium</h3>En reviewer trenger ikke skrivetilgang.</div>
+  </div>
+</section>
+
+<section>
+  <h2>Custom agent i Copilot</h2>
+  <div class="two-col wide-left" style="align-items:start">
+    <div>
+      <p class="file-label">.github/agents/reviewer.agent.md</p>
+      <pre><code class="language-markdown" data-trim data-line-numbers="1-6|2-3|4|5|7-11">
+---
+name: reviewer
+description: Gjennomgår endringer for feil, sikkerhet og avvik fra konvensjonene. Bruk etter implementasjon.
+tools: ['read', 'search']
+model: Claude Sonnet 5.5
+---
+Du er en erfaren reviewer. Du endrer ALDRI kode.
+Les diffen og relevante filer, og returner en
+prioritert liste med funn:
+- 🔴 Må fikses  - 🟡 Bør fikses  - 🟢 Forslag
+Vis til fil og linje. Finner du ingenting, si det.
+      </code></pre>
+    </div>
+    <div style="font-size:.55em">
+      <div class="card fragment slide-left" data-fragment-index="1"><b>name / description</b><br>Hvem — og <em>når</em> hovedagenten skal velge den.</div>
+      <div class="card orange fragment slide-left" data-fragment-index="2" style="margin-top:10px"><b>tools</b><br><code>read</code> <code>search</code> <code>edit</code> <code>execute</code> <code>agent</code> <code>web</code><br>👉 <b>Her begrenser du tilgang.</b></div>
+      <div class="card warm fragment slide-left" data-fragment-index="3" style="margin-top:10px"><b>model</b><br>Riktig modell for jobben.</div>
+      <div class="card green fragment slide-left" data-fragment-index="4" style="margin-top:10px"><b>Brødtekst</b><br>Rolle, regler og format på svaret.</div>
+    </div>
+  </div>
+  <aside class="notes">Nevn også: agents (VS Code) begrenser hvilke subagenter den får delegere til, og disable-model-invocation: true gjør at den bare kan startes manuelt.</aside>
+</section>
+
+<section>
+  <h2>Slik bruker du agentene</h2>
+  <div class="terminal" style="width:92%">
+    <div class="bar"><i></i><i></i><i></i><span>copilot</span></div>
+    <pre class="tw" style="min-height:11em"></pre>
+    <script type="text/plain" class="tw-src">
+$ /agent
+# Velg agent:  planner · reviewer · (standard)
+$ copilot --agent reviewer -p "Gå gjennom endringene mot main"
++ 🔍 reviewer: 🔴 1  🟡 2  🟢 3
+# … eller be hovedagenten delegere:
+$ Bruk reviewer-agenten til å se gjennom endringene.
++ ↳ Delegerer til reviewer (eget kontekstvindu) …
++ ✔ Sammendrag mottatt: 1 må fikses i UserService.java:42
+    </script>
+  </div>
+  <p class="hint">Trykk <b>T</b> for å spille av på nytt</p>
+</section>
+
+<!-- ============ KAPITTEL 2: PATTERNS (≈9 min) ============ -->
+<section class="dark chapter" data-particles
+  data-background-gradient="linear-gradient(135deg,#4d1d82 0%,#8b1d82 40%,#cf022b 100%)">
+  <div style="position:relative">
+    <div class="num">02</div>
+    <p class="muted">Fra enkelt til avansert</p>
+    <h2>🗺️ Orchestration patterns</h2>
+  </div>
+</section>
+
+<section>
+  <h2>Seks mønstre — én trapp 🪜</h2>
+  <div style="display:flex;align-items:flex-end;gap:10px;height:380px">
+    <div class="tier fragment grow" style="background:#2e9e5b;height:28%;flex:1">🔁<b>Agent loop</b></div>
+    <div class="tier fragment grow" style="background:#4d1d82;height:42%;flex:1">⛓️<b>Prompt chaining</b></div>
+    <div class="tier fragment grow" style="background:#8b1d82;height:56%;flex:1">🔀<b>Routing</b></div>
+    <div class="tier fragment grow" style="background:#a3165a;height:70%;flex:1">⚡<b>Parallellisering</b></div>
+    <div class="tier fragment grow" style="background:#cf022b;height:84%;flex:1">🎼<b>Orchestrator–workers</b></div>
+    <div class="tier fragment grow" style="background:#f07d00;height:98%;flex:1">🔄<b>Evaluator–optimizer</b></div>
+  </div>
+  <div class="callout fragment" style="text-align:center">👉 <b>Velg det enkleste som løser oppgaven.</b> Flere agenter = flere ting som kan gå galt, og høyere kostnad.</div>
+</section>
+
+<section>
+  <div class="pattern-grid">
+    <div>
+      <div class="pattern-num">Mønster 1</div>
+      <h2>🔁 Agent loop</h2>
+      <p style="font-size:.6em">Én agent i løkke — tenk → verktøy → observer — til oppgaven er løst. Grunnmønsteret alt annet bygger på.</p>
+      <div class="ex fragment"><b>Krav:</b> tydelig <b>stoppbetingelse</b> («alle tester grønne») og et <b>tak</b> på antall forsøk.</div>
+    </div>
+    <svg viewBox="0 0 500 320">
+      <circle cx="250" cy="160" r="110" fill="none" stroke="#f07d00" stroke-width="6" class="flow"/>
+      <circle r="11" fill="#cf022b"><animateMotion dur="2.5s" repeatCount="indefinite" path="M250,50 A110,110 0 1,1 249.9,50"/></circle>
+      <rect x="185" y="132" width="130" height="56" rx="14" fill="#4d1d82" class="pulse"/>
+      <text x="250" y="160" class="svgtxt" style="font-size:18px">🤖 Agent</text>
+      <text x="250" y="25" class="svgtxt dark">🧠 tenk</text>
+      <text x="405" y="165" class="svgtxt dark">🛠️ verktøy</text>
+      <text x="250" y="300" class="svgtxt dark">👀 observer</text>
+      <g class="fragment"><rect x="10" y="240" width="140" height="64" rx="12" fill="#2e9e5b"/>
+        <text x="80" y="262" class="svgtxt" style="font-size:13px">✅ Stopp: grønt</text>
+        <text x="80" y="284" class="svgtxt" style="font-size:13px">🔢 Tak: maks N</text></g>
+    </svg>
+  </div>
+</section>
+
+<section>
+  <div class="pattern-grid">
+    <div>
+      <div class="pattern-num">Mønster 2</div>
+      <h2>⛓️ Prompt chaining</h2>
+      <p style="font-size:.6em">Faste steg i fast rekkefølge. Output fra ett steg er input til neste — med sjekkpunkter underveis.</p>
+      <div class="ex fragment">💡 Workflow-skillen fra del 1 <em>er</em> dette mønsteret.</div>
+    </div>
+    <svg viewBox="0 0 500 320">
+      <path d="M70 160 L 430 160" stroke="#a8a8a7" stroke-width="4" class="flow" fill="none"/>
+      <rect x="10" y="125" width="110" height="70" rx="14" fill="#4d1d82"/><text x="65" y="160" class="svgtxt" style="font-size:13px">🗺️ Planlegg</text>
+      <rect x="135" y="125" width="110" height="70" rx="14" fill="#f07d00" class="pulse"/><text x="190" y="160" class="svgtxt" style="font-size:13px">✋ Godkjenn</text>
+      <rect x="260" y="125" width="110" height="70" rx="14" fill="#8b1d82"/><text x="315" y="160" class="svgtxt" style="font-size:13px">⌨️ Implementer</text>
+      <rect x="385" y="125" width="110" height="70" rx="14" fill="#2e9e5b"/><text x="440" y="160" class="svgtxt" style="font-size:13px">🧪 Test</text>
+      <circle r="9" fill="#cf022b"><animateMotion dur="4s" repeatCount="indefinite" keyPoints="0;0.33;0.33;1" keyTimes="0;0.3;0.6;1" calcMode="linear" path="M65,110 L 440,110"/></circle>
+      <text x="190" y="235" class="svgtxt dark" style="font-size:14px">menneske i løkka</text>
+    </svg>
+  </div>
+</section>
+
+<section>
+  <div class="pattern-grid">
+    <div>
+      <div class="pattern-num">Mønster 3</div>
+      <h2>🔀 Routing</h2>
+      <p style="font-size:.6em">En agent klassifiserer oppgaven og sender den til riktig spesialist.</p>
+      <div class="ex fragment">🐞 Bugrapport → debugger · ✨ Featureønske → planner</div>
+    </div>
+    <svg viewBox="0 0 500 320">
+      <path id="r1" d="M150 160 C 250 160, 250 55, 340 55" stroke="#f07d00" stroke-width="4" fill="none" class="flow"/>
+      <path d="M150 160 L 340 160" stroke="#a8a8a7" stroke-width="4" fill="none" class="flow"/>
+      <path id="r3" d="M150 160 C 250 160, 250 265, 340 265" stroke="#a8a8a7" stroke-width="4" fill="none" class="flow"/>
+      <rect x="20" y="125" width="130" height="70" rx="14" fill="#4d1d82"/><text x="85" y="160" class="svgtxt">🔀 Router</text>
+      <rect x="340" y="25" width="150" height="60" rx="14" fill="#cf022b"/><text x="415" y="55" class="svgtxt">🐞 Debugger</text>
+      <rect x="340" y="130" width="150" height="60" rx="14" fill="#8b1d82"/><text x="415" y="160" class="svgtxt">🗺️ Planner</text>
+      <rect x="340" y="235" width="150" height="60" rx="14" fill="#8b1d82"/><text x="415" y="265" class="svgtxt">📚 Docs</text>
+      <circle r="9" fill="#f07d00"><animateMotion dur="2s" repeatCount="indefinite" path="M150 160 C 250 160, 250 55, 340 55"/></circle>
+      <text x="85" y="105" class="svgtxt dark" style="font-size:14px">📨 «Appen krasjer …»</text>
+    </svg>
+  </div>
+</section>
+
+<section>
+  <div class="pattern-grid">
+    <div>
+      <div class="pattern-num">Mønster 4</div>
+      <h2>⚡ Parallellisering</h2>
+      <p style="font-size:.6em">Fan-out / fan-in: uavhengige deloppgaver kjører samtidig, resultatene samles til slutt.</p>
+      <div class="ex fragment">3 reviewere med ulikt fokus: 🔐 sikkerhet · 🚀 ytelse · 📖 lesbarhet<br>I Copilot CLI: <code>/fleet</code></div>
+    </div>
+    <svg viewBox="0 0 500 320">
+      <g stroke="#f07d00" stroke-width="4" fill="none" class="flow">
+        <path d="M110 160 C 150 160, 150 55, 195 55"/><path d="M110 160 L 195 160"/><path d="M110 160 C 150 160, 150 265, 195 265"/>
+        <path d="M305 55 C 350 55, 350 160, 390 160"/><path d="M305 160 L 390 160"/><path d="M305 265 C 350 265, 350 160, 390 160"/>
+      </g>
+      <rect x="10" y="125" width="100" height="70" rx="14" fill="#4d1d82"/><text x="60" y="160" class="svgtxt">📋 Plan</text>
+      <rect x="195" y="25" width="110" height="60" rx="14" fill="#8b1d82"/><text x="250" y="55" class="svgtxt">🔐 Sikkerhet</text>
+      <rect x="195" y="130" width="110" height="60" rx="14" fill="#8b1d82"/><text x="250" y="160" class="svgtxt">🚀 Ytelse</text>
+      <rect x="195" y="235" width="110" height="60" rx="14" fill="#8b1d82"/><text x="250" y="265" class="svgtxt">📖 Lesbarhet</text>
+      <rect x="390" y="125" width="100" height="70" rx="14" fill="#2e9e5b"/><text x="440" y="160" class="svgtxt">🧩 Samle</text>
+      <circle r="8" fill="#cf022b"><animateMotion dur="2.4s" repeatCount="indefinite" path="M110 160 C 150 160, 150 55, 195 55 L 305 55 C 350 55, 350 160, 390 160"/></circle>
+      <circle r="8" fill="#cf022b"><animateMotion dur="2s" repeatCount="indefinite" path="M110 160 L 390 160"/></circle>
+      <circle r="8" fill="#cf022b"><animateMotion dur="2.8s" repeatCount="indefinite" path="M110 160 C 150 160, 150 265, 195 265 L 305 265 C 350 265, 350 160, 390 160"/></circle>
+    </svg>
+  </div>
+</section>
+
+<section>
+  <div class="pattern-grid">
+    <div>
+      <div class="pattern-num">Mønster 5</div>
+      <h2>🎼 Orchestrator–workers</h2>
+      <p style="font-size:.6em">Orkestratoren bryter ned oppgaven <em>dynamisk</em>, delegerer og setter sammen resultatet.</p>
+      <div class="ex fragment" data-fragment-index="4">Passer når du <b>ikke vet på forhånd</b> hvilke deloppgaver som trengs.</div>
+    </div>
+    <svg viewBox="0 0 500 320" class="tree">
+      <rect x="170" y="20" width="160" height="64" rx="14" fill="#4d1d82" class="pulse"/><text x="250" y="52" class="svgtxt">🎼 Orkestrator</text>
+      <g class="fragment" data-fragment-index="1"><path class="draw" d="M250 84 C 250 150, 70 140, 70 210" stroke="#f07d00" stroke-width="4" fill="none"/>
+        <rect x="10" y="210" width="120" height="56" rx="12" fill="#8b1d82"/><text x="70" y="238" class="svgtxt">🔎 utforsk</text></g>
+      <g class="fragment" data-fragment-index="2"><path class="draw" d="M250 84 L 250 210" stroke="#f07d00" stroke-width="4" fill="none"/>
+        <rect x="190" y="210" width="120" height="56" rx="12" fill="#8b1d82"/><text x="250" y="238" class="svgtxt">⌨️ backend</text></g>
+      <g class="fragment" data-fragment-index="3"><path class="draw" d="M250 84 C 250 150, 430 140, 430 210" stroke="#f07d00" stroke-width="4" fill="none"/>
+        <rect x="370" y="210" width="120" height="56" rx="12" fill="#cf022b"/><text x="430" y="238" class="svgtxt">⚛️ frontend?!</text></g>
+      <text x="250" y="300" class="svgtxt dark" style="font-size:14px">workers opprettes underveis</text>
+    </svg>
+  </div>
+</section>
+
+<section>
+  <div class="pattern-grid">
+    <div>
+      <div class="pattern-num">Mønster 6</div>
+      <h2>🔄 Evaluator–optimizer</h2>
+      <p style="font-size:.6em">Én agent lager, en annen vurderer etter klare kriterier. Løkken går til kriteriene er oppfylt — eller taket er nådd.</p>
+      <div class="ex fragment">⌨️ implementer ↔ 🔍 reviewer, <b>maks 3 runder</b> — så spør et menneske.</div>
+    </div>
+    <svg viewBox="0 0 500 320">
+      <path d="M130 125 C 180 40, 320 40, 370 125" stroke="#f07d00" stroke-width="4" fill="none" class="flow"/>
+      <path d="M370 195 C 320 280, 180 280, 130 195" stroke="#cf022b" stroke-width="4" fill="none" class="flow"/>
+      <rect x="20" y="125" width="150" height="70" rx="14" fill="#4d1d82"/><text x="95" y="160" class="svgtxt">⌨️ Implementer</text>
+      <rect x="330" y="125" width="150" height="70" rx="14" fill="#8b1d82"/><text x="405" y="160" class="svgtxt">🔍 Reviewer</text>
+      <text x="250" y="45" class="svgtxt dark" style="font-size:14px">📝 utkast</text>
+      <text x="250" y="290" class="svgtxt" style="fill:#cf022b;font-size:14px">🔴 funn</text>
+      <circle r="9" fill="#f07d00"><animateMotion dur="3s" repeatCount="indefinite" path="M130 125 C 180 40, 320 40, 370 125 L 370 195 C 320 280, 180 280, 130 195 Z"/></circle>
+      <g class="fragment"><circle cx="250" cy="160" r="38" fill="#2e9e5b"/><text x="250" y="152" class="svgtxt" style="font-size:12px">runde</text><text x="250" y="170" class="svgtxt" style="font-size:18px">≤ 3</text></g>
+    </svg>
+  </div>
+</section>
+
+<section>
+  <h2>Hvilket mønster? 🧩</h2>
+  <div class="quiz">
+    <div class="q neutral">Oppgaven er liten og tydelig<span class="a purple">🔁 Agent loop</span></div>
+    <div class="q neutral">Alltid de samme stegene<span class="a purple">⛓️ Prompt chaining</span></div>
+    <div class="q neutral">Ulike typer oppgaver som krever ulik ekspertise<span class="a purple">🔀 Routing</span></div>
+    <div class="q neutral">Delbar i uavhengige biter<span class="a purple">⚡ Parallellisering</span></div>
+    <div class="q neutral">Stor og uoversiktlig<span class="a purple">🎼 Orchestrator–workers</span></div>
+    <div class="q neutral">Kvaliteten kan måles<span class="a purple">🔄 Evaluator–optimizer</span></div>
+  </div>
+  <p class="hint">👆 La salen gjette før du klikker</p>
+</section>
+
+<section>
+  <h2>⚠️ Fallgruver</h2>
+  <div class="cards c3">
+    <div class="card red fragment drop"><span class="icon">⏳</span><h3>Evig venting</h3>Agenter som venter på hverandre i det uendelige.</div>
+    <div class="card red fragment drop"><span class="icon">💥</span><h3>Filkollisjon</h3>Parallelle agenter som skriver til samme fil. Bruk egne worktrees/branches.</div>
+    <div class="card red fragment drop"><span class="icon">🐌</span><h3>Overdelegering</h3>Orkestratoren delegerer det som var raskere å gjøre selv.</div>
+  </div>
+</section>
+
+<!-- ============ KAPITTEL 3: MODELLER (≈5 min) ============ -->
+<section class="dark chapter" data-particles
+  data-background-gradient="linear-gradient(135deg,#4d1d82 0%,#8b1d82 40%,#cf022b 100%)">
+  <div style="position:relative">
+    <div class="num">03</div>
+    <p class="muted">Kost vs. kraft</p>
+    <h2>🧠 Riktig modell til riktig oppgave</h2>
+  </div>
+</section>
+
+<section>
+  <h2>Tre modellklasser</h2>
+  <div class="tiers">
+    <div class="tier l fragment grow"><span class="cost">💰</span><h3>Lett</h3><small>GPT-5 mini, GPT-5.4 mini</small><p>🔎 Søk og utforsking · formatering · oppsummering · mange småoppgaver</p></div>
+    <div class="tier m fragment grow"><span class="cost">💰💰</span><h3>Allsidig</h3><small>Claude Sonnet 5.5, GPT-5.4, Gemini Flash</small><p>⌨️ Daglig implementasjon · tester · review · de fleste workers</p></div>
+    <div class="tier h fragment grow"><span class="cost">💰💰💰💰</span><h3>Kraftig</h3><small>Claude Opus 5.5, GPT-5.5</small><p>🏛️ Arkitektur · planlegging · vanskelig debugging · orkestrering · sikkerhetsreview</p></div>
+  </div>
+  <p class="small muted" style="margin-top:.6em">Hver forespørsel koster <b>GitHub AI Credits</b>. Utvalget endrer seg ofte — sjekk <code>/model</code>.</p>
+</section>
+
+<section>
+  <h2>Tommelfingerregler</h2>
+  <div class="decide">
+    <div class="row fragment slide-left"><div class="qq">🗺️ Planlegging &amp; orkestrering</div><div class="arrow">➜</div><div class="ans" style="background:linear-gradient(90deg,#cf022b,#f07d00)">Kraftig — feil forplanter seg</div></div>
+    <div class="row fragment slide-left"><div class="qq">🔎 Utforsking &amp; søk</div><div class="arrow">➜</div><div class="ans" style="background:#2e9e5b">Lett — les mye, oppsummer</div></div>
+    <div class="row fragment slide-left"><div class="qq">⌨️ Implementasjon</div><div class="arrow">➜</div><div class="ans">Allsidig — bytt opp hvis den sliter</div></div>
+    <div class="row fragment slide-left"><div class="qq">🔍 Review</div><div class="arrow">➜</div><div class="ans" style="background:#8b1d82">En <em>annen</em> modell enn den som skrev</div></div>
+    <div class="row fragment slide-left"><div class="qq">🤷 Usikker?</div><div class="arrow">➜</div><div class="ans" style="background:#a8a8a7"><code style="background:rgba(255,255,255,.25);color:#fff">auto</code></div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Slik velger du modell</h2>
+  <div class="cards c3">
+    <div class="card fragment pop"><span class="icon">📄</span><h3>Per agent</h3><code>model:</code> i <code>.agent.md</code></div>
+    <div class="card orange fragment pop"><span class="icon">⌨️</span><h3>I økta</h3><code>/model</code> eller <code>--model</code></div>
+    <div class="card warm fragment pop"><span class="icon">🎚️</span><h3>Resonnering</h3><code>--effort low|medium|high</code></div>
+  </div>
+  <div class="callout fragment">💡 <code>/fleet</code>-subagenter bruker en <b>billig modell som standard</b>. Bestem modellvalget selv for deloppgaver som er viktige.</div>
+</section>
+
+<!-- ============ KAPITTEL 4: GUARDRAILS (≈7 min) ============ -->
+<section class="dark chapter" data-particles
+  data-background-gradient="linear-gradient(135deg,#4d1d82 0%,#8b1d82 40%,#cf022b 100%)">
+  <div style="position:relative">
+    <div class="num">04</div>
+    <p class="muted">Trygge rammer</p>
+    <h2>🛡️ Guardrails og tilganger</h2>
+  </div>
+</section>
+
+<section class="center" data-background-color="#fdf2e5">
+  <div class="big-emoji float">🏎️💨</div>
+  <p class="statement fragment blur-in">Tenk på agentene som en ny kollega<br>med <span class="orange">veldig</span> mye fart.</p>
+  <p class="fragment" style="font-size:.75em">Gi dem tilgang til det de trenger — <strong>og ikke mer</strong>.</p>
+</section>
+
+<section>
+  <h2>Fem lag med beskyttelse</h2>
+  <div class="two-col" style="grid-template-columns:520px 1fr">
+    <div class="onion">
+      <div class="ring fragment" data-fragment-index="5" style="width:520px;height:520px;background:#2a1449">5 · Menneske</div>
+      <div class="ring fragment" data-fragment-index="4" style="width:430px;height:430px;background:#f07d00">4 · Isolasjon</div>
+      <div class="ring fragment" data-fragment-index="3" style="width:340px;height:340px;background:#cf022b">3 · Hooks</div>
+      <div class="ring fragment" data-fragment-index="2" style="width:250px;height:250px;background:#8b1d82">2 · Godkjenning</div>
+      <div class="ring fragment" data-fragment-index="1" style="width:160px;height:160px;background:#4d1d82">1 · Privilegium</div>
+      <div class="core">🤖</div>
+    </div>
+    <ul class="onion-legend">
+      <li class="fragment" data-fragment-index="1"><span class="dot" style="background:#4d1d82"></span><b>Minste privilegium</b> — <code>tools:</code> i agentfilen</li>
+      <li class="fragment" data-fragment-index="2"><span class="dot" style="background:#8b1d82"></span><b>Godkjenning</b> — allow/deny-lister. <em>Deny vinner alltid.</em></li>
+      <li class="fragment" data-fragment-index="3"><span class="dot" style="background:#cf022b"></span><b>Hooks</b> — skript som kjører <em>før</em> et verktøy brukes</li>
+      <li class="fragment" data-fragment-index="4"><span class="dot" style="background:#f07d00"></span><b>Isolasjon</b> — dev container, sandbox, worktrees</li>
+      <li class="fragment" data-fragment-index="5"><span class="dot" style="background:#2a1449"></span><b>Menneske i løkka</b> — ingen AI-kode til <code>main</code> uten godkjent review</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>Hook som stopper farlige kommandoer</h2>
+  <div class="two-col" style="align-items:start">
+    <div>
+      <p class="file-label">.github/hooks/guardrails.json</p>
+      <pre><code class="language-json" data-trim data-line-numbers="4|5">
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      { "type": "command", "matcher": "bash",
+        "bash": "./.github/hooks/guard.sh",
+        "timeoutSec": 10 }
+    ]
+  }
+}
+      </code></pre>
+      <p class="file-label fragment" data-fragment-index="2">guard.sh svarer på stdout:</p>
+      <pre class="fragment" data-fragment-index="2"><code class="language-json" data-trim>
+{
+  "permissionDecision": "deny",
+  "permissionDecisionReason":
+    "Force push er ikke tillatt"
+}
+      </code></pre>
+    </div>
+    <div class="terminal fragment" data-fragment-index="3" data-flash>
+      <div class="bar"><i></i><i></i><i></i><span>copilot</span></div>
+      <pre class="tw" style="min-height:12em"></pre>
+      <script type="text/plain" class="tw-src">
+$ Vis innholdet i .env-filen
+# 🛠️ Shell  cat .env
+! ⛔ BLOKKERT av preToolUse-hook
+! «Agenten får ikke lese .env-filer»
+# 🧠 OK, jeg lar .env være.
+$ Kjør git push --force
+! ⛔ BLOKKERT — «Force push er ikke tillatt»
+      </script>
+    </div>
+  </div>
+  <div class="callout warn fragment" data-fragment-index="4" style="font-size:.5em">⚠️ En hook som får <b>timeout slipper kallet gjennom</b> (fails open). Hold skriptene små og raske.</div>
+</section>
+
+<section>
+  <h2>Best practices for trygg bruk</h2>
+  <div class="cards c4" style="gap:14px">
+    <div class="card red fragment pop"><span class="icon">🔑</span><h3>Hemmeligheter</h3>Aldri <code>.env</code>, nøkler eller sertifikater.</div>
+    <div class="card fragment pop"><span class="icon">🏢</span><h3>Kundedata</h3>Følg kundens og Sopra Sterias retningslinjer.</div>
+    <div class="card red fragment pop"><span class="icon">⛔</span><h3>Ingen <code>--yolo</code></h3><code>--allow-all</code> kun i isolert sandbox.</div>
+    <div class="card orange fragment pop"><span class="icon">🛑</span><h3>Stopp&shy;betingelser</h3>Alle løkker: maks runder + tydelig kriterium.</div>
+    <div class="card green fragment pop"><span class="icon">👀</span><h3>Stol, men verifiser</h3>Tester og review — også når alt «er grønt».</div>
+    <div class="card warm fragment pop"><span class="icon">🔐</span><h3>Fremmede skills</h3>Les dem før bruk — særlig skript og <code>allowed-tools</code>.</div>
+    <div class="card fragment pop"><span class="icon">🔎</span><h3>Sikkerhets&shy;review</h3>Hooks og allow-lister er sikkerhetskontroller.</div>
+    <div class="card fragment pop" style="background:#4d1d82;color:#fff;border-top-color:#f07d00"><span class="icon">🛡️</span><h3 style="color:#fff">Lag på lag</h3>Ingen enkelt guardrail er nok.</div>
+  </div>
+</section>
+
+<section>
+  <h2>🎓 Oppsummering</h2>
+  <ul style="font-size:.75em">
+    <li class="fragment">🤝 <strong>Subagenter</strong> gir rent kontekstvindu, spesialisering og parallellitet.</li>
+    <li class="fragment">🗺️ <strong>Patterns:</strong> start med agent loop eller kjede. Orkestrator, parallellisering og evaluator–optimizer bare når de trengs.</li>
+    <li class="fragment">🧠 <strong>Modellvalg:</strong> kraftig til planlegging, lett til utforsking, allsidig til implementasjon — <em>annen</em> modell til review.</li>
+    <li class="fragment">🛡️ <strong>Guardrails:</strong> minste privilegium, deny-lister, hooks, isolasjon og et menneske i løkka.</li>
+  </ul>
+</section>
+
+<!-- ============ WORKSHOP-INTRO ============ -->
+<section class="dark center" data-particles
+  data-background-gradient="linear-gradient(135deg,#2a1449 0%,#4d1d82 50%,#f07d00 140%)">
+  <div class="big-emoji float">🕸️</div>
+  <h2>Workshop 2</h2>
+  <p class="statement" style="font-size:1.1em">Bygg et agentteam med guardrails</p>
+  <p class="muted" style="font-size:.6em">Fortsett på <code>feature/ai-harness</code> · <code>5-AI/oppgaver-orkestrering.md</code></p>
+</section>
+
+<section>
+  <h2>To spor — velg ditt</h2>
+  <div class="cards c2">
+    <div class="card green fragment pop"><h3><span class="track g">🟢 Grunnspor</span> Oppgave 1–4</h3>To agenter med riktig modell og tilganger, koblet sammen, pluss en guardrail.</div>
+    <div class="card blue fragment pop"><h3><span class="track b">🔵 Ekspertspor</span> Oppgave 5–7</h3>Orkestrator, evaluator–optimizer-løkke og parallelle agenter.</div>
+  </div>
+  <div class="timeline fragment">
+    <div class="t g" style="flex:10"><b>1 · Planner</b>Bare read + search · 10 min</div>
+    <div class="t g" style="flex:10"><b>2 · Reviewer</b>Annen modellfamilie · 10 min</div>
+    <div class="t p" style="flex:8"><b>☕ Pause</b>5–10 min</div>
+    <div class="t g" style="flex:15"><b>3 · Koble sammen</b>Plan → ✋ → kode → review · 15 min</div>
+    <div class="t g" style="flex:15"><b>4 · Guardrail-hook</b>Blokker .env og force push · 15 min</div>
+  </div>
+  <div class="timeline fragment" style="margin-top:8px">
+    <div class="t b" style="flex:1;min-height:70px"><b>5 · Orkestrator med modellvalg</b></div>
+    <div class="t b" style="flex:1;min-height:70px"><b>6 · Evaluator–optimizer-løkke</b></div>
+    <div class="t b" style="flex:1;min-height:70px"><b>7 · Parallelt med /fleet</b></div>
+    <div class="t s" style="flex:1;min-height:70px"><b>🏁 Del med gruppen</b>siste 5–10 min</div>
+  </div>
+</section>
+
+<section class="dark center" data-background-color="#2a1449">
+  <h2>⏱️ Workshop pågår</h2>
+  <div class="timer" data-minutes="60">
+    <div class="timer-big">60:00</div>
+    <div class="timer-progress"><span></span></div>
+    <div class="timer-controls"><button data-act="start">▶ Start / pause</button><button class="sec" data-act="reset">↺ Nullstill</button></div>
+  </div>
+  <p class="muted" style="font-size:.5em;margin-top:1.5em">🤖 Står du fast? Bruk hjelpeprompten i <code>5-AI/AI-Helper.md</code></p>
+</section>
+
+<section class="dark center" data-particles
+  data-background-gradient="linear-gradient(135deg,#2a1449 0%,#4d1d82 55%,#8b1d82 100%)">
+  <h2>🏁 Del med gruppen</h2>
+  <div class="cards c3" style="text-align:left">
+    <div class="card fragment pop"><span class="icon">⭐</span>Hvilken agent eller skill var mest nyttig?</div>
+    <div class="card fragment pop"><span class="icon">😲</span>Hvilket modellvalg overrasket deg?</div>
+    <div class="card fragment pop"><span class="icon">🚀</span>Hva tar du med inn i prosjektet i morgen?</div>
+  </div>
+  <p class="statement fragment blur-in" style="font-size:1em;margin-top:1.2em">Harnessen er aldri ferdig.<br><span class="orange">Hver feil er en ny regel.</span></p>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/zoom/zoom.js"></script>
+<script src="assets/effects.js"></script>
+</body>
+</html>
